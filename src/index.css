@@ -1,0 +1,276 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Syne', system-ui, sans-serif;
+
+  /* Palette lifted from the Stampo design file */
+  --color-sun: #f5dc68; /* page ground / postbox yellow */
+  --color-ink: #1a1819; /* outlines + label text */
+  --color-post-red: #d62828; /* red mailbox, primary action */
+  --color-post-red-deep: #d62727;
+  --color-sky: #a4e1fe; /* blue mailbox */
+  --color-paper: #f7f4ee; /* white mailbox body */
+
+  --text-label: 16px;
+  --leading-label: 16px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-sun);
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  /* Illustration art is decorative — never let it be dragged or selected. */
+  img[data-art] {
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+  }
+}
+
+@theme {
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Mailbox groups arrive from below, one after another. Each sets its own
+ * `--rise-from` distance and every position is a fraction of it, so a box that
+ * travels further overshoots further.
+ *
+ * The spring lives in the keyframes rather than in one cubic-bezier: a single
+ * easing curve with a big overshoot spends its whole tail drifting back to rest.
+ * Here the recovery is a short, decisive correction with one small counter-bounce.
+ *
+ * Movement only — these shapes overlap heavily, so fading them in makes them
+ * ghost through each other.
+ */
+@keyframes rise-in {
+  0% {
+    transform: translateY(var(--rise-from, 40px));
+    animation-timing-function: cubic-bezier(0.12, 0.86, 0.24, 1);
+  }
+  44% {
+    /* Peak of the overshoot, past the resting position. */
+    transform: translateY(calc(var(--rise-from, 40px) * -0.2));
+    animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+  }
+  70% {
+    /* Snaps back, just past rest the other way. */
+    transform: translateY(calc(var(--rise-from, 40px) * 0.05));
+    animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
+  }
+  86% {
+    transform: translateY(calc(var(--rise-from, 40px) * -0.015));
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* The wordmark slides up on its own, a touch shorter and softer. */
+@keyframes slide-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Stamps spring up from behind the CTA, hang there, then drop back out of
+ * sight. Same shape as `rise-in`: a quick launch, an overshoot, then a short
+ * decisive correction with one small counter-bounce — not a long drift back.
+ * Most of the cycle is the hold at rest, so the pop reads as an event.
+ */
+@keyframes stamp-peek {
+  0%,
+  5% {
+    transform: translateY(34px);
+    animation-timing-function: cubic-bezier(0.12, 0.86, 0.24, 1);
+  }
+  18% {
+    /* Peak of the overshoot, above where the stamp comes to rest. */
+    transform: translateY(-9px);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+  }
+  25% {
+    transform: translateY(2.5px);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
+  }
+  31% {
+    transform: translateY(-1px);
+    animation-timing-function: ease-out;
+  }
+  36%,
+  78% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0);
+  }
+  100% {
+    transform: translateY(34px);
+  }
+}
+
+/*
+ * The stamp cutter's "punch": pressing the shutter briefly enlarges the white
+ * perforated layer — its cutout grows with it, revealing more of the photo
+ * underneath — while the red and yellow rings squeeze in around it, like the
+ * frame compressing under the same press. Both snap back afterward. Same
+ * launch-overshoot-recover shape as the rest of the app's motion, just
+ * compressed into a single decisive beat instead of an entrance.
+ *
+ * Kept subtle on purpose, red/yellow especially: these rings sit tightly
+ * nested against each other (the white layer's edge already runs close to
+ * red's), so growing white too much pushes it past the edge of the ring meant
+ * to hide it, and shrinking yellow — the outermost, largest layer — reveals
+ * the plain background at its own edge as it pulls in. Either reads as a
+ * visible glitch rather than a squeeze, so both stay small.
+ */
+@keyframes cutter-punch-out {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.16, 0.86, 0.24, 1);
+  }
+  32% {
+    transform: scale(1.035);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+  }
+  60% {
+    transform: scale(0.994);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cutter-punch-in {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.16, 0.86, 0.24, 1);
+  }
+  32% {
+    transform: scale(0.988);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+  }
+  60% {
+    transform: scale(1.002);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/*
+ * The finished stamp's arrival: it comes into being at the capture spot, the
+ * cut card popping out of the cutter. Scale only touches this element, never
+ * the wrapper that carries it up the screen afterwards, so the two motions
+ * compose instead of fighting.
+ */
+@keyframes stamp-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+    animation-timing-function: cubic-bezier(0.12, 0.86, 0.24, 1);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/*
+ * The ground the finished stamp lands on: rises from below to cover the
+ * camera view once the stamp has moved into place above it.
+ */
+@keyframes curtain-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/*
+ * The captured photo drops into the stamp window: it pops in oversized, then
+ * settles down to fill the window exactly, as if being placed into the frame.
+ * The window clips this, so the oversized start reads as a brief zoomed-in
+ * flash rather than actual overflow — no risk of the edge-of-frame glitches
+ * the ring punch above has to watch for.
+ */
+@keyframes photo-place {
+  0% {
+    transform: scale(1.4);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.16, 0.86, 0.24, 1);
+  }
+  22% {
+    opacity: 1;
+  }
+  60% {
+    transform: scale(0.97);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /*
+   * The rule above would leave the looping stamps parked on their final
+   * keyframe — hidden behind the button. Drop the animation instead so they
+   * simply rest in view.
+   */
+  [data-stamp-peek] {
+    animation: none !important;
+  }
+}
+
+@utility label {
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 400;
+  text-align: center;
+  /* `pre` keeps authored line breaks and stops labels re-wrapping in a pill. */
+  white-space: pre;
+}
