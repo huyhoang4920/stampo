@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import CaptureFrame, { PUNCH_MS } from '../components/CaptureFrame'
+import CaptureFrame, { PUNCH_MS, type CutterSize } from '../components/CaptureFrame'
 import Stamp from '../components/Stamp'
 import ModeToggle, { type CaptureMode } from '../components/ModeToggle'
+import SizeToggle from '../components/SizeToggle'
 import { useCamera } from '../lib/useCamera'
 import { clearDraft, saveDraft } from '../lib/draft'
 import { addStamp } from '../lib/collection'
@@ -11,7 +12,7 @@ import { todayISO } from '../lib/dates'
 import { decodeImage, sleep } from '../lib/images'
 
 /** The stamp popping into existence at the capture spot. */
-const APPEAR_MS = 320
+const APPEAR_MS = 400
 /**
  * The stamp travelling up and the yellow ground rising — one shared beat, so
  * they start together and land together.
@@ -37,6 +38,8 @@ type Phase = 'live' | 'appeared' | 'revealing' | 'settled'
 export default function Capture() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<CaptureMode>('capture')
+  /** 3 is the size the cutter art was drawn at; 1 and 2 crop wider. */
+  const [cutterSize, setCutterSize] = useState<CutterSize>(3)
   const { status, mirrored, attach, flip, focusAt, snapshot, snapshotRegion } = useCamera(
     mode === 'capture',
   )
@@ -269,21 +272,34 @@ export default function Capture() {
         />
       )}
 
-      {/* Back */}
-      <button
-        type="button"
-        onClick={() => navigate('/')}
-        aria-label="Back"
-        className={`label absolute top-[max(1.25rem,env(safe-area-inset-top))] left-6 z-30 rounded-full border border-white/40 px-4 py-2 text-white transition-opacity duration-300 active:scale-95 ${
+      {/*
+        Header: Back on its own row with the mode toggle centred beneath it, so
+        the toggle sits above the cutter instead of down among the controls.
+      */}
+      <div
+        className={`absolute inset-x-0 top-[max(1.25rem,env(safe-area-inset-top))] z-30 flex flex-col items-center gap-4 px-6 transition-opacity duration-300 ${
           capturing ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
       >
-        ← BACK
-      </button>
+        <div className="flex w-full">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            aria-label="Back"
+            className="label rounded-full border border-white/40 px-4 py-2 text-white active:scale-95"
+          >
+            ← BACK
+          </button>
+        </div>
+
+        <ModeToggle mode={mode} onChange={setMode} />
+      </div>
 
       {mode === 'capture' ? (
+        // Padded clear of the header above and the controls below, so the
+        // cutter still centres cleanly at its largest size.
         <div
-          className="relative flex h-full w-full flex-col items-center justify-center"
+          className="relative flex h-full w-full flex-col items-center justify-center pt-28 pb-36"
           onClick={handleTapToFocus}
         >
           {/*
@@ -291,7 +307,9 @@ export default function Capture() {
             stamp itself, so the two are never on screen together — there is
             only ever one stamp in this sequence.
           */}
-          {phase === 'live' && <CaptureFrame windowRef={windowRef} punchKey={punchKey} />}
+          {phase === 'live' && (
+            <CaptureFrame windowRef={windowRef} punchKey={punchKey} size={cutterSize} />
+          )}
 
           {!capturing && (status === 'denied' || status === 'unavailable') && (
             <p className="mt-6 max-w-[26ch] text-center text-[15px] leading-[21px] text-white/85">
@@ -330,52 +348,55 @@ export default function Capture() {
         }`}
       >
         {mode === 'capture' && (
-          <div className="flex items-center gap-8">
-            {/* Spacer keeps the shutter centred with a control on one side. */}
-            <span className="h-11 w-11" aria-hidden />
+          <>
+            <SizeToggle size={cutterSize} onChange={setCutterSize} />
 
-            <button
-              type="button"
-              onClick={handleShutter}
-              disabled={!live}
-              aria-label="Take photo"
-              className="grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-white disabled:opacity-40"
-            >
-              <span className="h-[58px] w-[58px] rounded-full bg-white active:scale-90 transition-transform" />
-            </button>
+            <div className="flex items-center gap-8">
+              {/* Spacer keeps the shutter centred with a control on one side. */}
+              <span className="h-11 w-11" aria-hidden />
 
-            <button
-              type="button"
-              onClick={flip}
-              disabled={!live}
-              aria-label={mirrored ? 'Switch to rear camera' : 'Switch to front camera'}
-              className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
-                <path
-                  d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1-1.6h4.6L14.3 6h3.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M9.2 12.5a2.8 2.8 0 0 0 4.9 1.6m.7-2.6a2.8 2.8 0 0 0-4.9-1.6"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M14.8 9.1V11h-1.9M9.2 15.9V14h1.9"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={handleShutter}
+                disabled={!live}
+                aria-label="Take photo"
+                className="grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-white disabled:opacity-40"
+              >
+                <span className="h-[58px] w-[58px] rounded-full bg-white active:scale-90 transition-transform" />
+              </button>
+
+              <button
+                type="button"
+                onClick={flip}
+                disabled={!live}
+                aria-label={mirrored ? 'Switch to rear camera' : 'Switch to front camera'}
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+                  <path
+                    d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1-1.6h4.6L14.3 6h3.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.2 12.5a2.8 2.8 0 0 0 4.9 1.6m.7-2.6a2.8 2.8 0 0 0-4.9-1.6"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M14.8 9.1V11h-1.9M9.2 15.9V14h1.9"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </>
         )}
-        <ModeToggle mode={mode} onChange={setMode} />
       </div>
 
       {phase !== 'live' && croppedImage && (
@@ -427,7 +448,7 @@ export default function Capture() {
               <Stamp
                 image={croppedImage}
                 animate={false}
-                className="animate-[stamp-appear_0.32s_linear_both]"
+                className="animate-[stamp-appear_0.4s_linear_both]"
               />
             </div>
 
