@@ -18,7 +18,7 @@ export default function ModeToggle({
   onChange: (mode: CaptureMode) => void
 }) {
   return (
-    <div className="flex rounded-full border border-white/30 bg-black/35 p-1 backdrop-blur-sm">
+    <div className="flex rounded-full border border-white/30 bg-black/65 p-1 backdrop-blur-sm">
       {OPTIONS.map((option) => {
         const active = option.mode === mode
         return (

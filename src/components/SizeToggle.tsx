@@ -18,7 +18,7 @@ export default function SizeToggle({
     <div
       role="group"
       aria-label="Stamp size"
-      className="flex items-center gap-1 rounded-full border border-white/30 bg-black/35 p-1 backdrop-blur-sm"
+      className="flex items-center gap-1 rounded-full border border-white/30 bg-black/65 p-1 backdrop-blur-sm"
     >
       {SIZES.map((value) => {
         const active = value === size

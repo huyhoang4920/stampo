@@ -26,11 +26,14 @@ export const PUNCH_MS = PUNCH_DELAY_MS.outer + PUNCH_DURATION_MS
  * and the crop is taken from that window's live rect — so picking a size picks
  * how much of the frame ends up on the stamp.
  *
- * The top end is bounded by the phone: at 1.28 the body is ~334px wide, which
- * still leaves a margin on a 375pt screen.
+ * The top end is a legibility limit rather than a geometric one. The white
+ * perforated ring — the part that reads as the stamp's edge — still fits on a
+ * 375pt screen well past 1.5, but the yellow body around it grows with it, and
+ * much beyond this it fills the screen and sits under both toggles instead of
+ * reading as a tool held over the shot.
  */
 export type CutterSize = 1 | 2 | 3
-export const CUTTER_SCALE: Record<CutterSize, number> = { 3: 1, 2: 1.14, 1: 1.28 }
+export const CUTTER_SCALE: Record<CutterSize, number> = { 3: 1, 2: 1.25, 1: 1.5 }
 
 type CaptureFrameProps = {
   /** The DOM node marking the window, so its live on-screen rect can be read at shutter time. */

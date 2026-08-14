@@ -414,7 +414,7 @@ export default function Capture() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   aria-label="Choose a different photo"
-                  className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95"
+                  className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/65 text-white backdrop-blur-sm active:scale-95"
                 >
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
                     <path
@@ -450,7 +450,7 @@ export default function Capture() {
                   onClick={flip}
                   disabled={!live}
                   aria-label={mirrored ? 'Switch to rear camera' : 'Switch to front camera'}
-                  className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
+                  className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/65 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
                 >
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
                     <path
