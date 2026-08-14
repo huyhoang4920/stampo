@@ -1,10 +1,15 @@
 /** A stamp the user cut out of a photo and filed into their collection. */
 export type Stamp = {
   id: string
-  /** Cropped stamp artwork, stored as a data URL so it survives a reload. */
+  /**
+   * The cut stamp artwork, stored as a data URL so it survives a reload.
+   *
+   * Only the cut is kept, not the photo it came from. The full frame ran to
+   * several megabytes as a data URL, which overran the storage an origin gets
+   * and left saving broken — and nothing read it. Re-cropping a filed stamp
+   * would need it back, but that wants IndexedDB rather than localStorage.
+   */
   image: string
-  /** Optional untouched source photo, kept so a stamp can be re-cropped. */
-  source?: string
   /** Where the stamp was collected, free text (e.g. "Kyoto, Japan"). */
   location: string
   /** Date on the stamp, ISO yyyy-mm-dd. */
@@ -14,11 +19,3 @@ export type Stamp = {
 }
 
 export type NewStamp = Omit<Stamp, 'id' | 'createdAt'>
-
-/** Draft carried across the capture → crop → details screens. */
-export type StampDraft = {
-  source?: string
-  cropped?: string
-  location?: string
-  date?: string
-}

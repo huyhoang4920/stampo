@@ -7,10 +7,9 @@ import ModeToggle, { type CaptureMode } from '../components/ModeToggle'
 import SizeToggle from '../components/SizeToggle'
 import { useCamera } from '../lib/useCamera'
 import UploadCropper from '../components/UploadCropper'
-import { clearDraft, saveDraft } from '../lib/draft'
 import { addStamp } from '../lib/collection'
 import { todayISO } from '../lib/dates'
-import { cropImageRegion, decodeImage, sleep } from '../lib/images'
+import { capImageSize, cropImageRegion, decodeImage, sleep } from '../lib/images'
 
 /** The stamp popping into existence at the capture spot. */
 const APPEAR_MS = 400
@@ -41,9 +40,7 @@ export default function Capture() {
   const [mode, setMode] = useState<CaptureMode>('capture')
   /** 3 is the size the cutter art was drawn at; 1 and 2 crop wider. */
   const [cutterSize, setCutterSize] = useState<CutterSize>(3)
-  const { status, mirrored, attach, flip, focusAt, snapshot, snapshotRegion } = useCamera(
-    mode === 'capture',
-  )
+  const { status, mirrored, attach, flip, focusAt, snapshotRegion } = useCamera(mode === 'capture')
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const uploadImgRef = useRef<HTMLImageElement | null>(null)
@@ -58,7 +55,8 @@ export default function Capture() {
   const [punchKey, setPunchKey] = useState(0)
   const [phase, setPhase] = useState<Phase>('live')
   const [croppedImage, setCroppedImage] = useState<string | undefined>()
-  const [sourceImage, setSourceImage] = useState<string | undefined>()
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   /** The chosen photo, held while the cutter is positioned over it. */
   const [uploadedImage, setUploadedImage] = useState<string | undefined>()
   const [date, setDate] = useState(todayISO)
@@ -146,8 +144,6 @@ export default function Capture() {
     const cropped = cropImageRegion(img, windowRect)
     if (!cropped) return
 
-    saveDraft({ cropped, source: uploadedImage })
-    setSourceImage(uploadedImage)
     setPunchKey((n) => n + 1)
     capturedAtRef.current = {
       left: windowRect.left,
@@ -163,10 +159,9 @@ export default function Capture() {
     const windowEl = windowRef.current
     if (!video || !windowEl) return
 
-    // Only the crop is encoded here. Encoding the full frame as well is slow
-    // enough at modern capture resolutions to block the main thread through
-    // the first frames of the punch, which shows up as a stutter right when
-    // the button is pressed — so it's deferred below instead.
+    // Only the cut is encoded. The full frame used to be kept alongside it for
+    // a future re-crop, but nothing read it and it ran to megabytes as a data
+    // URL — enough to exhaust the storage an origin gets and break saving.
     const windowRect = windowEl.getBoundingClientRect()
     const cropped = snapshotRegion(video, windowRect)
     if (!cropped) return
@@ -174,7 +169,6 @@ export default function Capture() {
     // Left paused, not hidden: the frozen frame stays on screen underneath so
     // the stamp appears over the shot it came from rather than over black.
     video.pause()
-    saveDraft({ cropped })
     setPunchKey((n) => n + 1)
     capturedAtRef.current = {
       left: windowRect.left,
@@ -183,18 +177,6 @@ export default function Capture() {
       height: windowRect.height,
     }
     void runResultSequence(cropped, PUNCH_MS)
-
-    // The untouched frame is only needed if the stamp gets re-cropped later,
-    // so it's encoded once the animation has the main thread to itself. The
-    // video is paused, so this still captures the frame that was shot.
-    timers.current.push(
-      window.setTimeout(() => {
-        const full = snapshot(video)
-        if (!full) return
-        setSourceImage(full)
-        saveDraft({ source: full })
-      }, PUNCH_MS + APPEAR_MS + REVEAL_MS),
-    )
   }
 
   /**
@@ -247,11 +229,11 @@ export default function Capture() {
     timers.current = []
     setPhase('live')
     setCroppedImage(undefined)
-    setSourceImage(undefined)
     setPunchKey(0)
     setCarrierStyle({ visibility: 'hidden' })
     setLocation('')
     setDate(todayISO())
+    setSaveError(null)
     capturedAtRef.current = null
     videoRef.current?.play().catch(() => {})
   }
@@ -261,35 +243,40 @@ export default function Capture() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        saveDraft({ source: reader.result })
-        setUploadedImage(reader.result)
-      }
+      if (typeof reader.result === 'string') setUploadedImage(reader.result)
     }
     reader.readAsDataURL(file)
   }
 
-  /** Files the stamp, then hands off to wherever the chosen action leads. */
-  function fileStamp() {
-    if (!croppedImage) return null
-    const saved = addStamp({
-      image: croppedImage,
-      source: sourceImage,
-      date,
-      location: location.trim(),
-    })
-    clearDraft()
-    return saved
+  /**
+   * Files the stamp, then hands off to wherever the chosen action leads. Any
+   * failure has to surface: a save that quietly does nothing is worse than one
+   * that says why.
+   */
+  async function fileStamp() {
+    if (!croppedImage || saving) return null
+    setSaving(true)
+    try {
+      const image = await capImageSize(croppedImage, 1200)
+      const saved = addStamp({ image, date, location: location.trim() })
+      setSaveError(null)
+      return saved
+    } catch {
+      setSaveError("Couldn't save this stamp — storage on this device is full.")
+      return null
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function handleSaveToCollection() {
-    if (fileStamp()) navigate('/collection')
+  async function handleSaveToCollection() {
+    if (await fileStamp()) navigate('/collection')
   }
 
-  function handleSendLetter() {
+  async function handleSendLetter() {
     // Filed first either way — a stamp you just made shouldn't be able to
     // vanish because the letter flow was abandoned halfway.
-    const saved = fileStamp()
+    const saved = await fileStamp()
     if (saved) navigate(`/send?stamp=${saved.id}`)
   }
 
@@ -582,17 +569,24 @@ export default function Capture() {
                 settled ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
             >
+              {saveError && (
+                <p className="mb-1 text-center text-[14px] leading-[20px] text-post-red-deep">
+                  {saveError}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleSaveToCollection}
-                className="label w-full rounded-full bg-post-red-deep py-4 text-white active:scale-[0.98]"
+                disabled={saving}
+                className="label w-full rounded-full bg-post-red-deep py-4 text-white active:scale-[0.98] disabled:opacity-60"
               >
                 SAVE TO COLLECTION
               </button>
               <button
                 type="button"
                 onClick={handleSendLetter}
-                className="label w-full rounded-full border-[0.5px] border-ink py-4 text-ink active:scale-[0.98]"
+                disabled={saving}
+                className="label w-full rounded-full border-[0.5px] border-ink py-4 text-ink active:scale-[0.98] disabled:opacity-60"
               >
                 SEND A LETTER
               </button>

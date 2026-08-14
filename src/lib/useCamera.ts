@@ -120,25 +120,6 @@ export function useCamera(active: boolean) {
    */
   const mirrored = facing === 'user'
 
-  /** The whole current frame, at the camera's native resolution. */
-  const snapshot = useCallback(
-    (video: HTMLVideoElement): string | null => {
-      if (!video.videoWidth) return null
-      const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return null
-      if (mirrored) {
-        ctx.translate(canvas.width, 0)
-        ctx.scale(-1, 1)
-      }
-      ctx.drawImage(video, 0, 0)
-      return canvas.toDataURL('image/jpeg', 0.92)
-    },
-    [mirrored],
-  )
-
   /**
    * Just the part of the current frame that falls inside `viewportRect` — a
    * rect in on-screen CSS pixels, e.g. from `element.getBoundingClientRect()`.
@@ -181,7 +162,7 @@ export function useCamera(active: boolean) {
     [mirrored],
   )
 
-  return { status, facing, mirrored, attach, flip, focusAt, snapshot, snapshotRegion }
+  return { status, facing, mirrored, attach, flip, focusAt, snapshotRegion }
 }
 
 async function requestContinuousFocus(stream: MediaStream) {

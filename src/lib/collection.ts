@@ -11,8 +11,22 @@ function read(): Stamp[] {
   }
 }
 
+/** Thrown when the origin's storage can't take another stamp. */
+export class CollectionFullError extends Error {
+  constructor() {
+    super('No room left in storage for another stamp.')
+    this.name = 'CollectionFullError'
+  }
+}
+
 function write(stamps: Stamp[]) {
-  localStorage.setItem(KEY, JSON.stringify(stamps))
+  try {
+    localStorage.setItem(KEY, JSON.stringify(stamps))
+  } catch {
+    // Quota is the only realistic failure here, and it has to reach the caller:
+    // swallowing it is what made saving look like it simply did nothing.
+    throw new CollectionFullError()
+  }
 }
 
 export function listStamps(): Stamp[] {
