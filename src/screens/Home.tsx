@@ -18,7 +18,7 @@ import stamp from '../assets/art/stamp-a.svg'
  * viewer moves most, so the row arrives with some depth to it rather than as one
  * sliding sheet. Same duration throughout, so a longer trip also reads faster.
  */
-const RISE = 'animate-[rise-in_1s_linear_both]'
+const RISE = 'animate-[rise-in_0.6s_linear_both]'
 /**
  * Long travel so the boxes read as rising into place rather than snapping to
  * it — each starts low enough that a good part of it is still below the frame.
