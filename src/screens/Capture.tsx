@@ -2,14 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CaptureFrame, { PUNCH_MS, type CutterSize } from '../components/CaptureFrame'
-import Stamp from '../components/Stamp'
+import Stamp, { STAMP_FRAME_SRC } from '../components/Stamp'
 import ModeToggle, { type CaptureMode } from '../components/ModeToggle'
 import SizeToggle from '../components/SizeToggle'
 import { useCamera } from '../lib/useCamera'
+import UploadCropper from '../components/UploadCropper'
 import { clearDraft, saveDraft } from '../lib/draft'
 import { addStamp } from '../lib/collection'
 import { todayISO } from '../lib/dates'
-import { decodeImage, sleep } from '../lib/images'
+import { cropImageRegion, decodeImage, sleep } from '../lib/images'
 
 /** The stamp popping into existence at the capture spot. */
 const APPEAR_MS = 400
@@ -45,6 +46,7 @@ export default function Capture() {
   )
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const uploadImgRef = useRef<HTMLImageElement | null>(null)
   const windowRef = useRef<HTMLDivElement | null>(null)
   const carrierRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -57,6 +59,8 @@ export default function Capture() {
   const [phase, setPhase] = useState<Phase>('live')
   const [croppedImage, setCroppedImage] = useState<string | undefined>()
   const [sourceImage, setSourceImage] = useState<string | undefined>()
+  /** The chosen photo, held while the cutter is positioned over it. */
+  const [uploadedImage, setUploadedImage] = useState<string | undefined>()
   const [date, setDate] = useState(todayISO)
   const [location, setLocation] = useState('')
   // Hidden until the layout effect below has measured and offset the stamp
@@ -67,6 +71,13 @@ export default function Capture() {
 
   const capturing = punchKey > 0
   const live = status === 'ready'
+
+  // The card's border is needed the instant the stamp appears, and it has
+  // never been requested before that point on a cold load — so fetch and
+  // decode it now, while the camera or the photo is still being framed.
+  useEffect(() => {
+    void decodeImage(STAMP_FRAME_SRC)
+  }, [])
 
   // Abandon anything in flight if the screen unmounts mid-sequence.
   useEffect(
@@ -112,10 +123,45 @@ export default function Capture() {
     })
   }, [phase])
 
+  /** One button for both modes: shoot the camera, or cut the uploaded photo. */
   function handleShutter() {
+    if (capturing) return
+    if (mode === 'upload') {
+      cutFromUpload()
+      return
+    }
+    captureFromCamera()
+  }
+
+  /**
+   * Cuts whatever the cutter is framing out of the uploaded photo, then runs
+   * the identical sequence a camera shot does — punch, stamp, curtain, form.
+   */
+  function cutFromUpload() {
+    const img = uploadImgRef.current
+    const windowEl = windowRef.current
+    if (!img || !windowEl || !uploadedImage) return
+
+    const windowRect = windowEl.getBoundingClientRect()
+    const cropped = cropImageRegion(img, windowRect)
+    if (!cropped) return
+
+    saveDraft({ cropped, source: uploadedImage })
+    setSourceImage(uploadedImage)
+    setPunchKey((n) => n + 1)
+    capturedAtRef.current = {
+      left: windowRect.left,
+      top: windowRect.top,
+      width: windowRect.width,
+      height: windowRect.height,
+    }
+    void runResultSequence(cropped, PUNCH_MS)
+  }
+
+  function captureFromCamera() {
     const video = videoRef.current
     const windowEl = windowRef.current
-    if (!video || !windowEl || capturing) return
+    if (!video || !windowEl) return
 
     // Only the crop is encoded here. Encoding the full frame as well is slow
     // enough at modern capture resolutions to block the main thread through
@@ -210,18 +256,14 @@ export default function Capture() {
     videoRef.current?.play().catch(() => {})
   }
 
+  /** Hands the photo to the cropping stage; the cut happens on the shutter. */
   function handleFile(file: File | undefined) {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        // An uploaded photo has no viewfinder window to crop against, so the
-        // whole photo becomes the stamp's image and the card's own window
-        // frames it. A proper crop step is future work for the cutter design.
         saveDraft({ source: reader.result })
-        capturedAtRef.current = null
-        setSourceImage(reader.result)
-        void runResultSequence(reader.result, 0)
+        setUploadedImage(reader.result)
       }
     }
     reader.readAsDataURL(file)
@@ -319,6 +361,19 @@ export default function Capture() {
             </p>
           )}
         </div>
+      ) : uploadedImage ? (
+        <>
+          {/* Same cutter as the camera, dragged over the photo instead. */}
+          {phase === 'live' && (
+            <UploadCropper
+              image={uploadedImage}
+              size={cutterSize}
+              punchKey={punchKey}
+              imgRef={uploadImgRef}
+              windowRef={windowRef}
+            />
+          )}
+        </>
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center px-10 text-center">
           <p className="max-w-[24ch] text-[15px] leading-[21px] text-white/85">
@@ -331,15 +386,17 @@ export default function Capture() {
           >
             CHOOSE PHOTO
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
         </div>
       )}
+
+      {/* Kept mounted in both modes so the picker survives a mode switch. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
 
       {/* Controls — fade out once a shot's been taken, so the result reads clearly. */}
       <div
@@ -347,53 +404,92 @@ export default function Capture() {
           capturing ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
       >
-        {mode === 'capture' && (
+        {/* Size and shutter serve both modes; only the side control differs. */}
+        {(mode === 'capture' || uploadedImage) && (
           <>
+            {/*
+              Sits with the controls rather than over the photo: the cutter can
+              be dragged right to the photo's edges, so any fixed spot on the
+              stage would end up underneath it.
+            */}
+            {mode === 'upload' && (
+              <p className="label pointer-events-none text-white/70">DRAG TO CHOOSE THE AREA</p>
+            )}
+
             <SizeToggle size={cutterSize} onChange={setCutterSize} />
 
             <div className="flex items-center gap-8">
-              {/* Spacer keeps the shutter centred with a control on one side. */}
-              <span className="h-11 w-11" aria-hidden />
+              {mode === 'capture' ? (
+                /* Spacer keeps the shutter centred with a control on one side. */
+                <span className="h-11 w-11" aria-hidden />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Choose a different photo"
+                  className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+                    <path
+                      d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-9Z"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="m4.8 16 4.3-4.2 3.1 3 2.4-2.2 4.6 4.3"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={handleShutter}
-                disabled={!live}
-                aria-label="Take photo"
+                disabled={mode === 'capture' && !live}
+                aria-label={mode === 'upload' ? 'Cut the stamp' : 'Take photo'}
                 className="grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-white disabled:opacity-40"
               >
                 <span className="h-[58px] w-[58px] rounded-full bg-white active:scale-90 transition-transform" />
               </button>
 
-              <button
-                type="button"
-                onClick={flip}
-                disabled={!live}
-                aria-label={mirrored ? 'Switch to rear camera' : 'Switch to front camera'}
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
-                  <path
-                    d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1-1.6h4.6L14.3 6h3.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M9.2 12.5a2.8 2.8 0 0 0 4.9 1.6m.7-2.6a2.8 2.8 0 0 0-4.9-1.6"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M14.8 9.1V11h-1.9M9.2 15.9V14h1.9"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+              {mode === 'capture' ? (
+                <button
+                  type="button"
+                  onClick={flip}
+                  disabled={!live}
+                  aria-label={mirrored ? 'Switch to rear camera' : 'Switch to front camera'}
+                  className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+                    <path
+                      d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1-1.6h4.6L14.3 6h3.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M9.2 12.5a2.8 2.8 0 0 0 4.9 1.6m.7-2.6a2.8 2.8 0 0 0-4.9-1.6"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M14.8 9.1V11h-1.9M9.2 15.9V14h1.9"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : (
+                <span className="h-11 w-11" aria-hidden />
+              )}
             </div>
           </>
         )}

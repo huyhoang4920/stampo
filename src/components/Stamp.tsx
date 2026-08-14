@@ -1,5 +1,11 @@
 import stampFrame from '../assets/art/stamp-frame.svg'
 
+/**
+ * Exposed so a screen that's about to show its first stamp can warm this
+ * first. Otherwise the card's border arrives a beat after the photo does.
+ */
+export const STAMP_FRAME_SRC = stampFrame
+
 /** The stamp's perforated card, authored at these exact proportions. */
 export const STAMP_W = 166.911
 export const STAMP_H = 240.023

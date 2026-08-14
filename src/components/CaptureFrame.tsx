@@ -4,11 +4,11 @@ import frameRed from '../assets/art/capture-frame-red.svg'
 import frameYellow from '../assets/art/capture-frame-yellow.svg'
 
 /** The cutter tool's outer body, authored at these exact proportions. */
-const CUTTER_W = 261
-const CUTTER_H = 367.72
+export const CUTTER_W = 261
+export const CUTTER_H = 367.72
 
 /** The plain rectangular window the decorative rings are cut to reveal. */
-const CUTTER_WINDOW = { left: 61, top: 78, width: 142, height: 205 }
+export const CUTTER_WINDOW = { left: 61, top: 78, width: 142, height: 205 }
 
 /**
  * Punch animation delays: white pops first, then red and yellow squeeze in
