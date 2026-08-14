@@ -8,6 +8,7 @@ import { useCamera } from '../lib/useCamera'
 import { clearDraft, saveDraft } from '../lib/draft'
 import { addStamp } from '../lib/collection'
 import { todayISO } from '../lib/dates'
+import { decodeImage, sleep } from '../lib/images'
 
 /** The stamp popping into existence at the capture spot. */
 const APPEAR_MS = 320
@@ -36,7 +37,9 @@ type Phase = 'live' | 'appeared' | 'revealing' | 'settled'
 export default function Capture() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<CaptureMode>('capture')
-  const { status, attach, snapshot, snapshotRegion } = useCamera(mode === 'capture')
+  const { status, mirrored, attach, flip, focusAt, snapshot, snapshotRegion } = useCamera(
+    mode === 'capture',
+  )
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const windowRef = useRef<HTMLDivElement | null>(null)
@@ -44,6 +47,8 @@ export default function Capture() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const timers = useRef<number[]>([])
   const capturedAtRef = useRef<Rect | null>(null)
+  /** Bumped to abandon an in-flight result sequence (retake, or unmount). */
+  const runIdRef = useRef(0)
 
   const [punchKey, setPunchKey] = useState(0)
   const [phase, setPhase] = useState<Phase>('live')
@@ -60,8 +65,14 @@ export default function Capture() {
   const capturing = punchKey > 0
   const live = status === 'ready'
 
-  // Clear any pending capture timers if the screen unmounts mid-sequence.
-  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  // Abandon anything in flight if the screen unmounts mid-sequence.
+  useEffect(
+    () => () => {
+      runIdRef.current += 1
+      timers.current.forEach(clearTimeout)
+    },
+    [],
+  )
 
   // The stamp is rendered in its final resting place in the layout — so to
   // start it at the capture spot instead, measure both and offset it there.
@@ -103,20 +114,18 @@ export default function Capture() {
     const windowEl = windowRef.current
     if (!video || !windowEl || capturing) return
 
-    // The full photo, kept so the stamp can be re-cropped later, plus the
-    // crop that matches exactly what was visible in the viewfinder window —
-    // that's the part that becomes the stamp.
-    const source = snapshot(video)
+    // Only the crop is encoded here. Encoding the full frame as well is slow
+    // enough at modern capture resolutions to block the main thread through
+    // the first frames of the punch, which shows up as a stutter right when
+    // the button is pressed — so it's deferred below instead.
     const windowRect = windowEl.getBoundingClientRect()
     const cropped = snapshotRegion(video, windowRect)
-    if (!source || !cropped) return
+    if (!cropped) return
 
     // Left paused, not hidden: the frozen frame stays on screen underneath so
     // the stamp appears over the shot it came from rather than over black.
-    // Left paused, not hidden: the frozen frame stays on screen underneath so
-    // the stamp appears over the shot it came from rather than over black.
     video.pause()
-    saveDraft({ source, cropped })
+    saveDraft({ cropped })
     setPunchKey((n) => n + 1)
     capturedAtRef.current = {
       left: windowRect.left,
@@ -124,7 +133,19 @@ export default function Capture() {
       width: windowRect.width,
       height: windowRect.height,
     }
-    beginResult(cropped, source, PUNCH_MS)
+    void runResultSequence(cropped, PUNCH_MS)
+
+    // The untouched frame is only needed if the stamp gets re-cropped later,
+    // so it's encoded once the animation has the main thread to itself. The
+    // video is paused, so this still captures the frame that was shot.
+    timers.current.push(
+      window.setTimeout(() => {
+        const full = snapshot(video)
+        if (!full) return
+        setSourceImage(full)
+        saveDraft({ source: full })
+      }, PUNCH_MS + APPEAR_MS + REVEAL_MS),
+    )
   }
 
   /**
@@ -132,21 +153,47 @@ export default function Capture() {
    * cutter punch time to finish when there was one; an uploaded photo has no
    * punch to wait for, and no capture spot to fly up from, so its stamp
    * simply appears in place (see the layout effect's null-rect fallback).
+   *
+   * Sequenced with awaits rather than a pile of timers so the reveal can also
+   * wait on the photo being decoded without the later beats drifting.
    */
-  function beginResult(stampImage: string, fullPhoto: string, appearAt: number) {
-    const revealAt = appearAt + APPEAR_MS
-    timers.current.push(
-      window.setTimeout(() => {
-        setCroppedImage(stampImage)
-        setSourceImage(fullPhoto)
-        setPhase('appeared')
-      }, appearAt),
-      window.setTimeout(() => setPhase('revealing'), revealAt),
-      window.setTimeout(() => setPhase('settled'), revealAt + REVEAL_MS),
-    )
+  async function runResultSequence(stampImage: string, appearAt: number) {
+    const run = ++runIdRef.current
+    const stillCurrent = () => runIdRef.current === run
+
+    // Both the delay and the decode have to finish: showing an undecoded data
+    // URL paints an empty card for a frame or two, which reads as a flicker.
+    await Promise.all([sleep(appearAt), decodeImage(stampImage)])
+    if (!stillCurrent()) return
+    setCroppedImage(stampImage)
+    setPhase('appeared')
+
+    await sleep(APPEAR_MS)
+    if (!stillCurrent()) return
+    setPhase('revealing')
+
+    await sleep(REVEAL_MS)
+    if (!stillCurrent()) return
+    setPhase('settled')
+  }
+
+  /**
+   * Nudges focus toward wherever the user tapped. Only some Android devices
+   * expose this; elsewhere the camera's continuous autofocus already handles
+   * it and this does nothing.
+   */
+  function handleTapToFocus(event: React.MouseEvent<HTMLDivElement>) {
+    const video = videoRef.current
+    if (!video || !live || capturing) return
+    const box = video.getBoundingClientRect()
+    const x = (event.clientX - box.left) / box.width
+    const y = (event.clientY - box.top) / box.height
+    if (x < 0 || x > 1 || y < 0 || y > 1) return
+    void focusAt(mirrored ? 1 - x : x, y)
   }
 
   function handleRetake() {
+    runIdRef.current += 1
     timers.current.forEach(clearTimeout)
     timers.current = []
     setPhase('live')
@@ -170,7 +217,8 @@ export default function Capture() {
         // frames it. A proper crop step is future work for the cutter design.
         saveDraft({ source: reader.result })
         capturedAtRef.current = null
-        beginResult(reader.result, reader.result, 0)
+        setSourceImage(reader.result)
+        void runResultSequence(reader.result, 0)
       }
     }
     reader.readAsDataURL(file)
@@ -217,7 +265,7 @@ export default function Capture() {
           playsInline
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
             live ? 'opacity-100' : 'opacity-0'
-          }`}
+          } ${mirrored ? 'scale-x-[-1]' : ''}`}
         />
       )}
 
@@ -234,7 +282,10 @@ export default function Capture() {
       </button>
 
       {mode === 'capture' ? (
-        <div className="relative flex h-full w-full flex-col items-center justify-center">
+        <div
+          className="relative flex h-full w-full flex-col items-center justify-center"
+          onClick={handleTapToFocus}
+        >
           {/*
             The cutter exists only up through the punch. It hands off to the
             stamp itself, so the two are never on screen together — there is
@@ -279,15 +330,50 @@ export default function Capture() {
         }`}
       >
         {mode === 'capture' && (
-          <button
-            type="button"
-            onClick={handleShutter}
-            disabled={!live}
-            aria-label="Take photo"
-            className="grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-white disabled:opacity-40"
-          >
-            <span className="h-[58px] w-[58px] rounded-full bg-white active:scale-90 transition-transform" />
-          </button>
+          <div className="flex items-center gap-8">
+            {/* Spacer keeps the shutter centred with a control on one side. */}
+            <span className="h-11 w-11" aria-hidden />
+
+            <button
+              type="button"
+              onClick={handleShutter}
+              disabled={!live}
+              aria-label="Take photo"
+              className="grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-white disabled:opacity-40"
+            >
+              <span className="h-[58px] w-[58px] rounded-full bg-white active:scale-90 transition-transform" />
+            </button>
+
+            <button
+              type="button"
+              onClick={flip}
+              disabled={!live}
+              aria-label={mirrored ? 'Switch to rear camera' : 'Switch to front camera'}
+              className="grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-black/35 text-white backdrop-blur-sm active:scale-95 disabled:opacity-40"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+                <path
+                  d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1-1.6h4.6L14.3 6h3.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M9.2 12.5a2.8 2.8 0 0 0 4.9 1.6m.7-2.6a2.8 2.8 0 0 0-4.9-1.6"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M14.8 9.1V11h-1.9M9.2 15.9V14h1.9"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         )}
         <ModeToggle mode={mode} onChange={setMode} />
       </div>

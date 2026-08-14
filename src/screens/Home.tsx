@@ -18,12 +18,17 @@ import stamp from '../assets/art/stamp-a.svg'
  * viewer moves most, so the row arrives with some depth to it rather than as one
  * sliding sheet. Same duration throughout, so a longer trip also reads faster.
  */
-const RISE = 'animate-[rise-in_0.56s_linear_both]'
+const RISE = 'animate-[rise-in_0.46s_linear_both]'
+/**
+ * Tight offsets: a box sitting still through its delay is a dead frame, and
+ * with the old 100ms steps the front box waited 300ms before doing anything.
+ * These still read as a cascade but everything is moving almost at once.
+ */
 const ENTRANCE = {
   white: { delay: '0ms', from: '26px' },
-  blue: { delay: '100ms', from: '46px' },
-  yellow: { delay: '200ms', from: '60px' },
-  red: { delay: '300ms', from: '78px' },
+  blue: { delay: '45ms', from: '46px' },
+  yellow: { delay: '90ms', from: '60px' },
+  red: { delay: '135ms', from: '78px' },
 } as const
 /** The wordmark leads the entrance — it starts the moment the page loads. */
 const LOGO_DELAY = '0ms'

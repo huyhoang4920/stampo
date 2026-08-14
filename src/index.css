@@ -58,7 +58,11 @@
  *
  * The spring lives in the keyframes rather than in one cubic-bezier: a single
  * easing curve with a big overshoot spends its whole tail drifting back to rest.
- * Here the recovery is a short, decisive correction with one small counter-bounce.
+ *
+ * Every segment eases in and out of its own turning point, which is what a real
+ * spring does — a flat-start easing after the peak makes the box hang there
+ * instead, and that hang is what reads as unresponsive even when the launch
+ * itself is instant.
  *
  * Movement only — these shapes overlap heavily, so fading them in makes them
  * ghost through each other.
@@ -66,20 +70,24 @@
 @keyframes rise-in {
   0% {
     transform: translateY(var(--rise-from, 40px));
-    animation-timing-function: cubic-bezier(0.12, 0.86, 0.24, 1);
+    animation-timing-function: cubic-bezier(0.15, 0.9, 0.3, 1);
   }
-  44% {
+  30% {
     /* Peak of the overshoot, past the resting position. */
-    transform: translateY(calc(var(--rise-from, 40px) * -0.2));
-    animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+    transform: translateY(calc(var(--rise-from, 40px) * -0.12));
+    animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
   }
-  70% {
-    /* Snaps back, just past rest the other way. */
-    transform: translateY(calc(var(--rise-from, 40px) * 0.05));
-    animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
+  52% {
+    /* Back down through rest and a little under. */
+    transform: translateY(calc(var(--rise-from, 40px) * 0.04));
+    animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
   }
-  86% {
-    transform: translateY(calc(var(--rise-from, 40px) * -0.015));
+  72% {
+    transform: translateY(calc(var(--rise-from, 40px) * -0.014));
+    animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
+  }
+  88% {
+    transform: translateY(calc(var(--rise-from, 40px) * 0.005));
     animation-timing-function: ease-out;
   }
   100% {
@@ -192,18 +200,21 @@
  * compose instead of fighting.
  */
 @keyframes stamp-appear {
+  /*
+   * Scale only, no fade. The stamp takes over the exact spot the cutter's
+   * clear window occupied, and that spot is dimmed the moment the cutter
+   * goes — so fading in from transparent shows the dim through it first,
+   * which reads as the stamp flickering.
+   */
   0% {
-    opacity: 0;
-    transform: scale(0.86);
+    transform: scale(0.9);
     animation-timing-function: cubic-bezier(0.12, 0.86, 0.24, 1);
   }
   60% {
-    opacity: 1;
-    transform: scale(1.04);
+    transform: scale(1.03);
     animation-timing-function: ease-out;
   }
   100% {
-    opacity: 1;
     transform: scale(1);
   }
 }
