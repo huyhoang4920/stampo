@@ -56,13 +56,13 @@
  * `--rise-from` distance and every position is a fraction of it, so a box that
  * travels further overshoots further.
  *
- * The spring lives in the keyframes rather than in one cubic-bezier: a single
- * easing curve with a big overshoot spends its whole tail drifting back to rest.
+ * Shaped as a rise rather than a spring: most of the distance is covered in one
+ * long decelerating glide, and it only just overshoots before settling. A big
+ * overshoot with several bounces reads as a punch, however well damped.
  *
- * Every segment eases in and out of its own turning point, which is what a real
- * spring does — a flat-start easing after the peak makes the box hang there
- * instead, and that hang is what reads as unresponsive even when the launch
- * itself is instant.
+ * The turning points still ease in and out of themselves — a flat-start easing
+ * after the peak makes a box hang there, which reads as unresponsive no matter
+ * how quick the launch was.
  *
  * Movement only — these shapes overlap heavily, so fading them in makes them
  * ghost through each other.
@@ -70,25 +70,16 @@
 @keyframes rise-in {
   0% {
     transform: translateY(var(--rise-from, 40px));
-    animation-timing-function: cubic-bezier(0.15, 0.9, 0.3, 1);
-  }
-  30% {
-    /* Peak of the overshoot, past the resting position. */
-    transform: translateY(calc(var(--rise-from, 40px) * -0.12));
-    animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
-  }
-  52% {
-    /* Back down through rest and a little under. */
-    transform: translateY(calc(var(--rise-from, 40px) * 0.04));
-    animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
+    animation-timing-function: cubic-bezier(0.3, 0.55, 0.25, 1);
   }
   72% {
-    transform: translateY(calc(var(--rise-from, 40px) * -0.014));
+    /* Drifts a little past rest at the top of the glide. */
+    transform: translateY(calc(var(--rise-from, 40px) * -0.055));
     animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
   }
-  88% {
-    transform: translateY(calc(var(--rise-from, 40px) * 0.005));
-    animation-timing-function: ease-out;
+  89% {
+    transform: translateY(calc(var(--rise-from, 40px) * 0.016));
+    animation-timing-function: cubic-bezier(0.36, 0, 0.64, 1);
   }
   100% {
     transform: translateY(0);

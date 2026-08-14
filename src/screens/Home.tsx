@@ -18,17 +18,17 @@ import stamp from '../assets/art/stamp-a.svg'
  * viewer moves most, so the row arrives with some depth to it rather than as one
  * sliding sheet. Same duration throughout, so a longer trip also reads faster.
  */
-const RISE = 'animate-[rise-in_0.46s_linear_both]'
+const RISE = 'animate-[rise-in_1s_linear_both]'
 /**
- * Tight offsets: a box sitting still through its delay is a dead frame, and
- * with the old 100ms steps the front box waited 300ms before doing anything.
- * These still read as a cascade but everything is moving almost at once.
+ * Long travel so the boxes read as rising into place rather than snapping to
+ * it — each starts low enough that a good part of it is still below the frame.
+ * Offsets stay small: a box sitting still through its delay is a dead frame.
  */
 const ENTRANCE = {
-  white: { delay: '0ms', from: '26px' },
-  blue: { delay: '45ms', from: '46px' },
-  yellow: { delay: '90ms', from: '60px' },
-  red: { delay: '135ms', from: '78px' },
+  white: { delay: '0ms', from: '80px' },
+  blue: { delay: '70ms', from: '120px' },
+  yellow: { delay: '140ms', from: '150px' },
+  red: { delay: '210ms', from: '190px' },
 } as const
 /** The wordmark leads the entrance — it starts the moment the page loads. */
 const LOGO_DELAY = '0ms'
@@ -54,7 +54,7 @@ export default function Home() {
         data-art
         src={logo}
         alt="Stampo"
-        className="absolute top-[107px] left-12 w-[343px] animate-[slide-up-in_0.7s_var(--ease-out-soft)_both]"
+        className="absolute top-[107px] left-12 w-[343px] animate-[slide-up-in_0.85s_var(--ease-out-soft)_both]"
         style={{ animationDelay: LOGO_DELAY }}
       />
 
