@@ -29,6 +29,11 @@ export function addStamp(stamp: NewStamp): Stamp {
   return saved
 }
 
+/** Change a stamp's details in place; identity and filing date are kept. */
+export function updateStamp(id: string, patch: Partial<Pick<Stamp, 'date' | 'location'>>) {
+  write(read().map((s) => (s.id === id ? { ...s, ...patch } : s)))
+}
+
 export function removeStamp(id: string) {
   write(read().filter((s) => s.id !== id))
 }

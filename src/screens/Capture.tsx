@@ -5,7 +5,9 @@ import CaptureFrame, { PUNCH_MS } from '../components/CaptureFrame'
 import Stamp from '../components/Stamp'
 import ModeToggle, { type CaptureMode } from '../components/ModeToggle'
 import { useCamera } from '../lib/useCamera'
-import { saveDraft } from '../lib/draft'
+import { clearDraft, saveDraft } from '../lib/draft'
+import { addStamp } from '../lib/collection'
+import { todayISO } from '../lib/dates'
 
 /** The stamp popping into existence at the capture spot. */
 const APPEAR_MS = 320
@@ -46,6 +48,9 @@ export default function Capture() {
   const [punchKey, setPunchKey] = useState(0)
   const [phase, setPhase] = useState<Phase>('live')
   const [croppedImage, setCroppedImage] = useState<string | undefined>()
+  const [sourceImage, setSourceImage] = useState<string | undefined>()
+  const [date, setDate] = useState(todayISO)
+  const [location, setLocation] = useState('')
   // Hidden until the layout effect below has measured and offset the stamp
   // onto the capture spot. `visibility` rather than `opacity` because CSS
   // animations outrank inline styles, and the stamp's appear animation owns
@@ -108,6 +113,8 @@ export default function Capture() {
 
     // Left paused, not hidden: the frozen frame stays on screen underneath so
     // the stamp appears over the shot it came from rather than over black.
+    // Left paused, not hidden: the frozen frame stays on screen underneath so
+    // the stamp appears over the shot it came from rather than over black.
     video.pause()
     saveDraft({ source, cropped })
     setPunchKey((n) => n + 1)
@@ -117,12 +124,21 @@ export default function Capture() {
       width: windowRect.width,
       height: windowRect.height,
     }
+    beginResult(cropped, source, PUNCH_MS)
+  }
 
-    const appearAt = PUNCH_MS
+  /**
+   * Runs the appear → move + curtain → settle sequence. `appearAt` gives the
+   * cutter punch time to finish when there was one; an uploaded photo has no
+   * punch to wait for, and no capture spot to fly up from, so its stamp
+   * simply appears in place (see the layout effect's null-rect fallback).
+   */
+  function beginResult(stampImage: string, fullPhoto: string, appearAt: number) {
     const revealAt = appearAt + APPEAR_MS
     timers.current.push(
       window.setTimeout(() => {
-        setCroppedImage(cropped)
+        setCroppedImage(stampImage)
+        setSourceImage(fullPhoto)
         setPhase('appeared')
       }, appearAt),
       window.setTimeout(() => setPhase('revealing'), revealAt),
@@ -135,8 +151,11 @@ export default function Capture() {
     timers.current = []
     setPhase('live')
     setCroppedImage(undefined)
+    setSourceImage(undefined)
     setPunchKey(0)
     setCarrierStyle({ visibility: 'hidden' })
+    setLocation('')
+    setDate(todayISO())
     capturedAtRef.current = null
     videoRef.current?.play().catch(() => {})
   }
@@ -146,14 +165,39 @@ export default function Capture() {
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        // No viewfinder window to auto-crop an uploaded photo against, so it
-        // moves on as-is — cropping it is future work for once the cutter
-        // has a design.
+        // An uploaded photo has no viewfinder window to crop against, so the
+        // whole photo becomes the stamp's image and the card's own window
+        // frames it. A proper crop step is future work for the cutter design.
         saveDraft({ source: reader.result })
-        navigate('/stamp/new')
+        capturedAtRef.current = null
+        beginResult(reader.result, reader.result, 0)
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  /** Files the stamp, then hands off to wherever the chosen action leads. */
+  function fileStamp() {
+    if (!croppedImage) return null
+    const saved = addStamp({
+      image: croppedImage,
+      source: sourceImage,
+      date,
+      location: location.trim(),
+    })
+    clearDraft()
+    return saved
+  }
+
+  function handleSaveToCollection() {
+    if (fileStamp()) navigate('/collection')
+  }
+
+  function handleSendLetter() {
+    // Filed first either way — a stamp you just made shouldn't be able to
+    // vanish because the letter flow was abandoned halfway.
+    const saved = fileStamp()
+    if (saved) navigate(`/send?stamp=${saved.id}`)
   }
 
   const settled = phase === 'settled'
@@ -302,25 +346,54 @@ export default function Capture() {
             </div>
 
             <div
-              className={`mt-10 text-center transition-opacity duration-300 ${settled ? 'opacity-100' : 'opacity-0'}`}
-            >
-              <h1 className="text-[44px] leading-[0.95] font-extrabold tracking-[-0.03em] uppercase">
-                Nice stamp!
-              </h1>
-              <p className="mx-auto mt-5 max-w-[30ch] text-[15px] leading-[22px] text-ink/70">
-                Next, give it a date and place.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/stamp/new')}
-              className={`label mt-auto w-full rounded-full bg-post-red-deep py-4 text-white transition-opacity duration-300 active:scale-[0.98] ${
+              className={`mt-8 transition-opacity duration-300 ${
                 settled ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
             >
-              NEXT
-            </button>
+              <label className="label block text-left text-ink/60" htmlFor="stamp-date">
+                DATE
+              </label>
+              <input
+                id="stamp-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-ink/25 bg-white/55 px-4 py-3 text-[16px] text-ink"
+              />
+
+              <label className="label mt-5 block text-left text-ink/60" htmlFor="stamp-location">
+                LOCATION
+              </label>
+              <input
+                id="stamp-location"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Where did you find it?"
+                className="mt-2 w-full rounded-xl border border-ink/25 bg-white/55 px-4 py-3 text-[16px] text-ink placeholder:text-ink/35"
+              />
+            </div>
+
+            <div
+              className={`mt-auto flex flex-col gap-3 pt-6 transition-opacity duration-300 ${
+                settled ? 'opacity-100' : 'pointer-events-none opacity-0'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={handleSaveToCollection}
+                className="label w-full rounded-full bg-post-red-deep py-4 text-white active:scale-[0.98]"
+              >
+                SAVE TO COLLECTION
+              </button>
+              <button
+                type="button"
+                onClick={handleSendLetter}
+                className="label w-full rounded-full border-[0.5px] border-ink py-4 text-ink active:scale-[0.98]"
+              >
+                SEND A LETTER
+              </button>
+            </div>
           </div>
         </div>
       )}

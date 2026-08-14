@@ -5,18 +5,21 @@ export const STAMP_W = 166.911
 export const STAMP_H = 240.023
 
 /**
- * Margin between the card's edge and the photo — measured off the reference
- * design, not derived from the frame art itself (the SVG has no separate
- * window shape; it's one solid perforated card, photo laid on top of it).
+ * How far the photo sits inside the card's edge, as a share of the card —
+ * measured off the reference design. A percentage rather than a pixel value
+ * so a stamp stays correct at any size (the collection grid scales them down
+ * to fit a column).
  */
-const MARGIN_X = 19.2
-const MARGIN_Y = 27.6
+const PHOTO_INSET = '11.5%'
+const PHOTO_SIZE = '77%'
 
 type StampProps = {
   /** The photo to set on the card — a stamp is always frame + photo together. */
   image: string
   /** Plays the "dropped into place" pop the moment this mounts. Default on. */
   animate?: boolean
+  /** Any CSS width; height follows from the card's aspect ratio. */
+  width?: number | string
   className?: string
 }
 
@@ -30,18 +33,26 @@ type StampProps = {
  * For the live camera viewfinder — the red/white rings, yellow cutter
  * housing, dimming spotlight, and shutter-triggered punch — see CaptureFrame.
  */
-export default function Stamp({ image, animate = true, className }: StampProps) {
+export default function Stamp({
+  image,
+  animate = true,
+  width = STAMP_W,
+  className,
+}: StampProps) {
   return (
-    <div className={`relative ${className ?? ''}`} style={{ width: STAMP_W, height: STAMP_H }}>
+    <div
+      className={`relative ${className ?? ''}`}
+      style={{ width, aspectRatio: `${STAMP_W} / ${STAMP_H}` }}
+    >
       <img data-art src={stampFrame} alt="" className="absolute inset-0 h-full w-full" />
 
       <div
         className="absolute overflow-hidden"
         style={{
-          left: MARGIN_X,
-          top: MARGIN_Y,
-          width: STAMP_W - MARGIN_X * 2,
-          height: STAMP_H - MARGIN_Y * 2,
+          left: PHOTO_INSET,
+          top: PHOTO_INSET,
+          width: PHOTO_SIZE,
+          height: PHOTO_SIZE,
         }}
       >
         <img
