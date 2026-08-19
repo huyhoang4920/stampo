@@ -505,7 +505,7 @@ export default function Capture() {
             reflows and the stamp's measured resting place stays honest.
             Ordered after the curtain so the stamp always paints above it.
           */}
-          <div className="relative flex h-full flex-col px-6 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))]">
+          <div className="relative flex h-full flex-col overflow-y-auto px-6 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))]">
             <button
               type="button"
               onClick={handleRetake}
@@ -592,7 +592,11 @@ export default function Capture() {
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="relative w-full rounded-xl bg-transparent px-3 py-3 text-[16px] text-ink"
+                      // Fixed height rather than relying on the padding alone —
+                      // some mobile browsers size a date input to its own
+                      // internal picker control and ignore vertical padding,
+                      // which left it hugging the text shorter than LOCATION.
+                      className="relative block h-[50px] w-full rounded-xl bg-transparent px-3 text-[16px] text-ink"
                     />
                   </div>
                 </div>
@@ -612,7 +616,7 @@ export default function Capture() {
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="Where?"
-                      className="relative w-full rounded-xl bg-transparent px-3 py-3 text-[16px] text-ink placeholder:text-ink/35"
+                      className="relative block h-[50px] w-full rounded-xl bg-transparent px-3 text-[16px] text-ink placeholder:text-ink/35"
                     />
                   </div>
                 </div>
