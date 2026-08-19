@@ -596,7 +596,10 @@ export default function Capture() {
                       // some mobile browsers size a date input to its own
                       // internal picker control and ignore vertical padding,
                       // which left it hugging the text shorter than LOCATION.
-                      className="relative block h-[50px] w-full rounded-xl bg-transparent px-3 text-[16px] text-ink"
+                      // Line-height matching that same height is what actually
+                      // centers the date digits in the box — without it some
+                      // browsers set the internal fields top-aligned instead.
+                      className="relative block h-[50px] w-full rounded-xl bg-transparent px-3 text-[16px] leading-[50px] text-ink"
                     />
                   </div>
                 </div>
