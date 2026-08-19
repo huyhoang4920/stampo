@@ -18,7 +18,7 @@ export default function ScreenStub({ title, note }: { title: string; note: strin
       </button>
 
       <div className="mt-16">
-        <h1 className="max-w-[8ch] text-[44px] leading-[0.95] font-extrabold tracking-[-0.03em] uppercase">
+        <h1 className="whitespace-pre-line font-headline text-[48px] leading-[0.95] font-medium tracking-[-0.03em]">
           {title}
         </h1>
         <p className="mt-5 max-w-[30ch] text-[15px] leading-[22px] text-ink/70">{note}</p>

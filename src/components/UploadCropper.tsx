@@ -1,17 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Ref } from 'react'
-import CaptureFrame, {
-  CUTTER_H,
-  CUTTER_SCALE,
-  CUTTER_W,
-  CUTTER_WINDOW,
-  type CutterSize,
-} from './CaptureFrame'
+import CaptureFrame, { CUTTER_H, CUTTER_W, CUTTER_WINDOW } from './CaptureFrame'
+
+/** How far in the photo can be pushed, as a multiple of its opening size. */
+const MAX_ZOOM = 8
 
 type UploadCropperProps = {
   /** The uploaded photo, as a data URL. */
   image: string
-  size: CutterSize
   punchKey: number
   /** The displayed <img>, so the capture screen can crop from it. */
   imgRef: Ref<HTMLImageElement>
@@ -19,35 +15,26 @@ type UploadCropperProps = {
   windowRef: Ref<HTMLDivElement>
 }
 
-/**
- * Where the cut is, and how far the photo has been scrolled under it.
- * `cut` is in the photo's own pixels; `slide` is how much of the photo is off
- * the left/top of the screen.
- */
-type View = { cutX: number; cutY: number; slideX: number; slideY: number }
+/** Where the photo sits: its centre on screen, and how far it's zoomed in. */
+type View = { scale: number; centreX: number; centreY: number }
 
 /**
- * Positions the cutter over an uploaded photo, shown at the full height of the
- * screen — so a landscape one runs off both sides, more than fits at once.
+ * Frames an uploaded photo for cutting. The cutter is fixed in the middle of
+ * the screen and the photo moves under it — dragged with one finger, pinched
+ * with two — which is the way a crop is normally chosen, and means the frame
+ * the user is aiming at never wanders off under their hand.
  *
- * The cutter moves freely wherever there's screen to move in, and the photo
- * only scrolls once the cutter is pressed against an edge of the screen. Both
- * are needed: driving the scroll off the cutter's position directly would pin
- * it to the middle and it would never appear to move at all.
+ * The photo is held so it always covers the window: there is no way to line
+ * the cut up with empty space.
  */
-export default function UploadCropper({
-  image,
-  size,
-  punchKey,
-  imgRef,
-  windowRef,
-}: UploadCropperProps) {
+export default function UploadCropper({ image, punchKey, imgRef, windowRef }: UploadCropperProps) {
   const stageRef = useRef<HTMLDivElement | null>(null)
-  const dragFrom = useRef<{ x: number; y: number } | null>(null)
+  /** Live pointers, so one finger pans and two pinch. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const gesture = useRef<{ distance: number; midX: number; midY: number } | null>(null)
 
   const [stage, setStage] = useState({ w: 0, h: 0 })
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
-  /** Null until dragged; the opening view below stands in meanwhile. */
   const [stored, setStored] = useState<View | null>(null)
 
   useLayoutEffect(() => {
@@ -66,99 +53,124 @@ export default function UploadCropper({
     setStored(null)
   }, [image])
 
-  const scale = CUTTER_SCALE[size]
-  const cutW = CUTTER_WINDOW.width * scale
-  const cutH = CUTTER_WINDOW.height * scale
+  const cutW = CUTTER_WINDOW.width
+  const cutH = CUTTER_WINDOW.height
 
   /**
    * The window isn't centred in the cutter body — it sits 1.5px right of and
-   * 3.4px above centre at scale 1. Everything here positions and clamps the
-   * *window*, since that is what gets cropped, so the body is offset by this
-   * to compensate.
+   * 3.4px above centre. The body is offset by that so the window itself lands
+   * on the middle of the screen, which is what the crop is taken from.
    */
-  const windowOffsetX = (CUTTER_WINDOW.left + CUTTER_WINDOW.width / 2 - CUTTER_W / 2) * scale
-  const windowOffsetY = (CUTTER_WINDOW.top + CUTTER_WINDOW.height / 2 - CUTTER_H / 2) * scale
+  const windowOffsetX = CUTTER_WINDOW.left + CUTTER_WINDOW.width / 2 - CUTTER_W / 2
+  const windowOffsetY = CUTTER_WINDOW.top + CUTTER_WINDOW.height / 2 - CUTTER_H / 2
 
-  // Shown at the height of the screen, keeping the photo's aspect ratio.
-  const shownH = stage.h
-  const shownW = natural && natural.h ? natural.w * (stage.h / natural.h) : 0
-  const ready = Boolean(natural && stage.h > 0 && shownW > 0)
+  const ready = Boolean(natural && stage.w > 0 && stage.h > 0)
 
-  const limits = {
-    cutX: [cutW / 2, Math.max(cutW / 2, shownW - cutW / 2)] as const,
-    cutY: [cutH / 2, Math.max(cutH / 2, shownH - cutH / 2)] as const,
-    slideX: Math.max(0, shownW - stage.w),
-    slideY: Math.max(0, shownH - stage.h),
-  }
+  /** Small enough to still cover the window — anything less can't be cut. */
+  const minScale = natural ? Math.max(cutW / natural.w, cutH / natural.h) : 1
+  /** Opens at the height of the screen, as before. */
+  const openingScale = natural ? Math.max(stage.h / natural.h, minScale) : 1
 
-  /**
-   * Keeps the cut inside the photo, and scrolls the photo only by however much
-   * the cutter would otherwise hang off the edge of the screen.
-   */
+  const opening: View = { scale: openingScale, centreX: stage.w / 2, centreY: stage.h / 2 }
+
+  /** Keeps the zoom in range and the photo over the window. */
   function settle(next: View): View {
-    const cutX = clamp(next.cutX, limits.cutX[0], limits.cutX[1])
-    const cutY = clamp(next.cutY, limits.cutY[0], limits.cutY[1])
-
-    let slideX = next.slideX
-    const screenX = cutX - slideX
-    if (screenX < cutW / 2) slideX -= cutW / 2 - screenX
-    else if (screenX > stage.w - cutW / 2) slideX += screenX - (stage.w - cutW / 2)
-
-    let slideY = next.slideY
-    const screenY = cutY - slideY
-    if (screenY < cutH / 2) slideY -= cutH / 2 - screenY
-    else if (screenY > stage.h - cutH / 2) slideY += screenY - (stage.h - cutH / 2)
-
+    if (!natural) return next
+    const scale = clamp(next.scale, minScale, openingScale * MAX_ZOOM)
+    const shownW = natural.w * scale
+    const shownH = natural.h * scale
+    // The window is centred, so the photo's centre can only stray by however
+    // much of it hangs past the window on that axis.
+    const roomX = Math.max(0, (shownW - cutW) / 2)
+    const roomY = Math.max(0, (shownH - cutH) / 2)
     return {
-      cutX,
-      cutY,
-      slideX: clamp(slideX, 0, limits.slideX),
-      slideY: clamp(slideY, 0, limits.slideY),
+      scale,
+      centreX: clamp(next.centreX, stage.w / 2 - roomX, stage.w / 2 + roomX),
+      centreY: clamp(next.centreY, stage.h / 2 - roomY, stage.h / 2 + roomY),
     }
   }
 
-  /** Opens on the middle of the photo, cutter centred on screen. */
-  const opening: View = {
-    cutX: shownW / 2,
-    cutY: shownH / 2,
-    slideX: clamp(shownW / 2 - stage.w / 2, 0, limits.slideX),
-    slideY: clamp(shownH / 2 - stage.h / 2, 0, limits.slideY),
+  const view = ready ? settle(stored ?? opening) : opening
+  const shownW = natural ? natural.w * view.scale : 0
+  const shownH = natural ? natural.h * view.scale : 0
+
+  /** Zooms about a point on screen, keeping the photo pixel under it still. */
+  function zoomAbout(previous: View, factor: number, focusX: number, focusY: number): View {
+    const scale = clamp(previous.scale * factor, minScale, openingScale * MAX_ZOOM)
+    const applied = scale / previous.scale
+    return settle({
+      scale,
+      centreX: focusX + (previous.centreX - focusX) * applied,
+      centreY: focusY + (previous.centreY - focusY) * applied,
+    })
   }
-
-  // Settled here rather than in an effect: it's pure and idempotent, so this
-  // also re-reins the view when the size changes the window's edges, with no
-  // extra render pass and nothing to keep in sync.
-  const view = ready ? settle(stored ?? opening) : null
-
-  const photoLeft = shownW > stage.w ? -(view?.slideX ?? 0) : (stage.w - shownW) / 2
-  const photoTop = shownH > stage.h ? -(view?.slideY ?? 0) : (stage.h - shownH) / 2
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     try {
       event.currentTarget.setPointerCapture(event.pointerId)
     } catch {
-      // Capture is only an improvement — the drag still tracks without it.
+      // Capture is only an improvement — the gesture still tracks without it.
     }
-    dragFrom.current = { x: event.clientX, y: event.clientY }
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    gesture.current = null
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    const from = dragFrom.current
-    if (!from) return
-    const dx = event.clientX - from.x
-    const dy = event.clientY - from.y
-    dragFrom.current = { x: event.clientX, y: event.clientY }
+    if (!pointers.current.has(event.pointerId)) return
+    const previousPoint = pointers.current.get(event.pointerId)!
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    const points = [...pointers.current.values()]
+
+    if (points.length >= 2) {
+      const [a, b] = points
+      const distance = Math.hypot(a.x - b.x, a.y - b.y)
+      const midX = (a.x + b.x) / 2
+      const midY = (a.y + b.y) / 2
+      const last = gesture.current
+      gesture.current = { distance, midX, midY }
+      if (!last || !last.distance) return
+
+      const stageBox = stageRef.current?.getBoundingClientRect()
+      const focusX = midX - (stageBox?.left ?? 0)
+      const focusY = midY - (stageBox?.top ?? 0)
+      const factor = distance / last.distance
+      const panX = midX - last.midX
+      const panY = midY - last.midY
+
+      setStored((prev) => {
+        const base = prev ?? opening
+        const zoomed = zoomAbout(base, factor, focusX, focusY)
+        // The pinch can travel as well as spread, so carry the midpoint too.
+        return settle({ ...zoomed, centreX: zoomed.centreX + panX, centreY: zoomed.centreY + panY })
+      })
+      return
+    }
+
+    const dx = event.clientX - previousPoint.x
+    const dy = event.clientY - previousPoint.y
     // Built off the previous state, not the rendered value: several moves can
-    // arrive between renders, and reading the render's copy here would make
-    // each of them start from the same stale position.
-    setStored((previous) => {
-      const base = previous ?? opening
-      return settle({ ...base, cutX: base.cutX + dx, cutY: base.cutY + dy })
+    // arrive between renders, and reading the render's copy would make each of
+    // them start from the same stale position.
+    setStored((prev) => {
+      const base = prev ?? opening
+      return settle({ ...base, centreX: base.centreX + dx, centreY: base.centreY + dy })
     })
   }
 
-  function handlePointerUp() {
-    dragFrom.current = null
+  function endPointer(event: React.PointerEvent<HTMLDivElement>) {
+    pointers.current.delete(event.pointerId)
+    // Dropping to one finger restarts the pinch rather than jumping the photo.
+    gesture.current = null
+  }
+
+  /** Trackpad and mouse wheel, so the same framing works on a desktop. */
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    const stageBox = stageRef.current?.getBoundingClientRect()
+    const focusX = event.clientX - (stageBox?.left ?? 0)
+    const focusY = event.clientY - (stageBox?.top ?? 0)
+    const factor = Math.exp(-event.deltaY / 300)
+    setStored((prev) => zoomAbout(prev ?? opening, factor, focusX, focusY))
   }
 
   return (
@@ -168,8 +180,9 @@ export default function UploadCropper({
       style={{ touchAction: 'none' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
+      onWheel={handleWheel}
     >
       <img
         ref={imgRef}
@@ -181,30 +194,30 @@ export default function UploadCropper({
         }
         className="absolute select-none"
         style={{
-          left: photoLeft,
-          top: photoTop,
-          height: shownH || undefined,
+          left: view.centreX - shownW / 2,
+          top: view.centreY - shownH / 2,
           width: shownW || undefined,
+          height: shownH || undefined,
           // Preflight caps images at the container width, which would stop a
-          // landscape photo from running past the edges as intended.
+          // zoomed or landscape photo from running past the edges as intended.
           maxWidth: 'none',
         }}
       />
 
-      {ready && view && (
+      {ready && (
         <div
-          className="absolute"
+          className="pointer-events-none absolute"
           style={{
-            // Placed so the *window* lands on the cut point, not the body.
-            left: photoLeft + view.cutX - windowOffsetX,
-            top: photoTop + view.cutY - windowOffsetY,
+            // Fixed in the middle, placed so the *window* is what's centred.
+            left: stage.w / 2 - windowOffsetX,
+            top: stage.h / 2 - windowOffsetY,
             width: CUTTER_W,
             height: CUTTER_H,
             marginLeft: -CUTTER_W / 2,
             marginTop: -CUTTER_H / 2,
           }}
         >
-          <CaptureFrame windowRef={windowRef} punchKey={punchKey} size={size} />
+          <CaptureFrame windowRef={windowRef} punchKey={punchKey} />
         </div>
       )}
     </div>

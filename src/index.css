@@ -1,7 +1,21 @@
 @import 'tailwindcss';
 
+/*
+ * Bundled rather than fetched: the headline is the first thing on screen, and
+ * a webfont request would let it land in a fallback first.
+ */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('./assets/fonts/BricolageGrotesque-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --font-display: 'Syne', system-ui, sans-serif;
+  /* Headlines only; Syne still carries labels and body copy. */
+  --font-headline: 'Bricolage Grotesque', 'Syne', system-ui, sans-serif;
 
   /* Palette lifted from the Stampo design file */
   --color-sun: #f5dc68; /* page ground / postbox yellow */

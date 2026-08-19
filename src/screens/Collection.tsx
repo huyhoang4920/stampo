@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useNavigate } from 'react-router-dom'
 import Stamp from '../components/Stamp'
 import StampDetail from '../components/StampDetail'
-import Postmark from '../components/Postmark'
+import StampDeco from '../components/StampDeco'
 import { listStamps, removeStamp, updateStamp } from '../lib/collection'
 import type { Stamp as StampType } from '../lib/types'
 import { formatStampDate } from '../lib/dates'
@@ -64,10 +64,15 @@ export default function Collection() {
       stamp,
       from: { left: box.left, top: box.top, width: box.width, height: box.height },
     })
+    // A popup, not a page: the URL never changes, only history depth does —
+    // one throwaway entry at the same address, pushed purely so the back
+    // gesture has something of ours to land on and close instead of leaving
+    // Collection outright.
+    window.history.pushState({ stampDetail: true }, '', window.location.href)
   }
 
   /** Flies the stamp back to its cell, then tears the overlay down. */
-  function handleClose() {
+  function closeFlight() {
     const el = carrierRef.current
     if (!detail || !el) return
 
@@ -86,6 +91,34 @@ export default function Collection() {
     )
   }
 
+  /**
+   * Closing via the UI (the ← CLOSE button, or tapping the stamp itself) —
+   * runs the same flight the back gesture triggers, and also unwinds the
+   * dummy history entry `handleOpen` pushed, so a later back press lands
+   * wherever it would have if the stamp had never been opened.
+   */
+  function handleClose() {
+    if (!detail) return
+    closeFlight()
+    window.history.back()
+  }
+
+  /**
+   * The back gesture (or hardware back button) pops that dummy entry on its
+   * own — this catches the resulting `popstate` and mirrors it as a normal
+   * close instead of leaving Collection outright. Guarded by `closing`,
+   * which `handleClose` already sets synchronously, so a close started here
+   * doesn't also trigger this for the very pop it caused.
+   */
+  useEffect(() => {
+    function onPopState() {
+      if (detail && !closing) closeFlight()
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail, closing])
+
   function handleDelete() {
     if (!detail) return
     removeStamp(detail.stamp.id)
@@ -94,6 +127,7 @@ export default function Collection() {
     setDetail(null)
     setClosing(false)
     setReady(false)
+    window.history.back()
   }
 
   function handleSave(patch: { date: string; location: string }) {
@@ -108,25 +142,19 @@ export default function Collection() {
 
   return (
     <div className="relative min-h-dvh bg-flame">
-      <div className="px-6 pb-16 pt-[max(1.5rem,env(safe-area-inset-top))]">
-        {/*
-          The postmark rides up here beside Back rather than next to the
-          title: at this display size "Your stamp" alone is nearly the full
-          content width, so anything sharing its line would collide.
-        */}
-        <div className="flex items-start justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="label w-fit rounded-full border-[0.5px] border-sun px-4 py-2 text-sun"
-          >
-            ← BACK
-          </button>
-          <Postmark className="shrink-0" />
-        </div>
+      <StampDeco variant="blue" />
 
-        <h1 className="mt-6 text-[36px] leading-[0.95] font-extrabold tracking-[-0.03em] text-sun">
-          Your stamp collection
+      <div className="px-6 pb-16 pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="label w-fit rounded-full border-[0.5px] border-sun px-4 py-2 text-sun"
+        >
+          ← BACK
+        </button>
+
+        <h1 className="mt-6 whitespace-pre-line font-headline text-[48px] leading-[0.95] font-medium tracking-[-0.03em] text-sun">
+          {'Your stamp\ncollection'}
         </h1>
 
         {stamps.length === 0 ? (
@@ -144,13 +172,13 @@ export default function Collection() {
           <div className="mt-10">
             {groups.map(({ date, items }, index) => (
               <section key={date} className={index > 0 ? 'mt-8' : undefined}>
-                <h2 className="label text-left text-[17px] text-ink">{formatStampDate(date)}</h2>
+                <h2 className="label text-left text-[20px] text-ink">{formatStampDate(date)}</h2>
 
                 {/*
                   Three across with no gaps, so neighbouring stamps meet at
                   their perforations the way a sheet of them would.
                 */}
-                <div className="mt-4 grid grid-cols-3">
+                <div className="mt-2 grid grid-cols-3">
                   {items.map((stamp) => (
                     <button
                       key={stamp.id}
@@ -183,6 +211,7 @@ export default function Collection() {
           stamp={detail.stamp}
           carrierRef={carrierRef}
           ready={ready}
+          closing={closing}
           onClose={handleClose}
           onSend={(stamp) => navigate(`/send?stamp=${stamp.id}`)}
           onSave={handleSave}

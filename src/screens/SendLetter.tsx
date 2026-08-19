@@ -32,8 +32,8 @@ export default function SendLetter() {
       </button>
 
       <div className="mt-16">
-        <h1 className="max-w-[8ch] text-[44px] leading-[0.95] font-extrabold tracking-[-0.03em] uppercase">
-          Send a letter
+        <h1 className="whitespace-pre-line font-headline text-[48px] leading-[0.95] font-medium tracking-[-0.03em]">
+          {'Send a\nletter'}
         </h1>
         <p className="mt-5 max-w-[30ch] text-[15px] leading-[22px] text-ink/70">
           Renders your stamp into a short video to share — the flow for writing

@@ -1,4 +1,5 @@
 import stampFrame from '../assets/art/stamp-frame.svg'
+import { CUTTER_WINDOW } from './CaptureFrame'
 
 /**
  * Exposed so a screen that's about to show its first stamp can warm this
@@ -6,18 +7,32 @@ import stampFrame from '../assets/art/stamp-frame.svg'
  */
 export const STAMP_FRAME_SRC = stampFrame
 
-/** The stamp's perforated card, authored at these exact proportions. */
+/**
+ * The card's shape. Width keeps the frame art's authored proportions; height
+ * is derived from the cutter window's ratio rather than the art's own, so a
+ * captured photo — cut to that window — always lands here at its native
+ * ratio. Keeping the two in lockstep is what stops the result stamp
+ * distorting mid-flight: the FLIP move in Capture.tsx scales this card
+ * straight out of the window's rect, and that only reads as a clean grow
+ * (not a squash-then-correct) when the window and the card agree on shape.
+ */
 export const STAMP_W = 166.911
-export const STAMP_H = 240.023
+export const STAMP_H = STAMP_W * (CUTTER_WINDOW.height / CUTTER_WINDOW.width)
 
 /**
- * How far the photo sits inside the card's edge, as a share of the card —
- * measured off the reference design. A percentage rather than a pixel value
- * so a stamp stays correct at any size (the collection grid scales them down
- * to fit a column).
+ * How far the photo sits inside the card's edge, and how big it is — as a
+ * share of the card, so a stamp stays correct at any size. Width keeps the
+ * margin measured off the reference design; height is capped shorter than
+ * the card's own (window-matched) ratio would give, tuned by eye to 300:185,
+ * so the photo always leaves a visible, even margin all round instead of
+ * crowding the scalloped edge — object-cover trims a sliver off the top and
+ * bottom of a captured photo to make room.
  */
-const PHOTO_INSET = '11.5%'
-const PHOTO_SIZE = '77%'
+const PHOTO_SIZE_X = 77
+const PHOTO_DISPLAY_RATIO = 300 / 185 // height : width, the card's own ratio runs taller than this
+const PHOTO_SIZE_Y = PHOTO_DISPLAY_RATIO * PHOTO_SIZE_X * (STAMP_W / STAMP_H)
+const PHOTO_INSET_X = (100 - PHOTO_SIZE_X) / 2
+const PHOTO_INSET_Y = (100 - PHOTO_SIZE_Y) / 2
 
 type StampProps = {
   /** The photo to set on the card — a stamp is always frame + photo together. */
@@ -55,10 +70,10 @@ export default function Stamp({
       <div
         className="absolute overflow-hidden"
         style={{
-          left: PHOTO_INSET,
-          top: PHOTO_INSET,
-          width: PHOTO_SIZE,
-          height: PHOTO_SIZE,
+          left: `${PHOTO_INSET_X}%`,
+          top: `${PHOTO_INSET_Y}%`,
+          width: `${PHOTO_SIZE_X}%`,
+          height: `${PHOTO_SIZE_Y}%`,
         }}
       >
         <img

@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import CaptureFrame, { PUNCH_MS, type CutterSize } from '../components/CaptureFrame'
-import Stamp, { STAMP_FRAME_SRC } from '../components/Stamp'
+import CaptureFrame, { PUNCH_MS } from '../components/CaptureFrame'
+import Stamp, { STAMP_FRAME_SRC, STAMP_H } from '../components/Stamp'
+import StampDeco from '../components/StampDeco'
+import stampPress from '../assets/art/stamp-press.svg'
+import messagePaperSvg from '../assets/art/message-paper.svg?raw'
+import fieldLineSvg from '../assets/art/field-line.svg?raw'
 import ModeToggle, { type CaptureMode } from '../components/ModeToggle'
-import SizeToggle from '../components/SizeToggle'
 import { useCamera } from '../lib/useCamera'
 import UploadCropper from '../components/UploadCropper'
 import { addStamp } from '../lib/collection'
@@ -38,8 +41,6 @@ type Phase = 'live' | 'appeared' | 'revealing' | 'settled'
 export default function Capture() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<CaptureMode>('capture')
-  /** 3 is the size the cutter art was drawn at; 1 and 2 crop wider. */
-  const [cutterSize, setCutterSize] = useState<CutterSize>(3)
   const { status, mirrored, attach, flip, focusAt, snapshotRegion } = useCamera(mode === 'capture')
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -61,6 +62,7 @@ export default function Capture() {
   const [uploadedImage, setUploadedImage] = useState<string | undefined>()
   const [date, setDate] = useState(todayISO)
   const [location, setLocation] = useState('')
+  const [message, setMessage] = useState('')
   // Hidden until the layout effect below has measured and offset the stamp
   // onto the capture spot. `visibility` rather than `opacity` because CSS
   // animations outrank inline styles, and the stamp's appear animation owns
@@ -233,6 +235,7 @@ export default function Capture() {
     setCarrierStyle({ visibility: 'hidden' })
     setLocation('')
     setDate(todayISO())
+    setMessage('')
     setSaveError(null)
     capturedAtRef.current = null
     videoRef.current?.play().catch(() => {})
@@ -337,7 +340,7 @@ export default function Capture() {
             only ever one stamp in this sequence.
           */}
           {phase === 'live' && (
-            <CaptureFrame windowRef={windowRef} punchKey={punchKey} size={cutterSize} />
+            <CaptureFrame windowRef={windowRef} punchKey={punchKey} />
           )}
 
           {!capturing && (status === 'denied' || status === 'unavailable') && (
@@ -350,11 +353,10 @@ export default function Capture() {
         </div>
       ) : uploadedImage ? (
         <>
-          {/* Same cutter as the camera, dragged over the photo instead. */}
+          {/* Same cutter as the camera, with the photo moved under it. */}
           {phase === 'live' && (
             <UploadCropper
               image={uploadedImage}
-              size={cutterSize}
               punchKey={punchKey}
               imgRef={uploadImgRef}
               windowRef={windowRef}
@@ -394,16 +396,10 @@ export default function Capture() {
         {/* Size and shutter serve both modes; only the side control differs. */}
         {(mode === 'capture' || uploadedImage) && (
           <>
-            {/*
-              Sits with the controls rather than over the photo: the cutter can
-              be dragged right to the photo's edges, so any fixed spot on the
-              stage would end up underneath it.
-            */}
+            {/* Sits with the controls; the cutter itself never moves now. */}
             {mode === 'upload' && (
-              <p className="label pointer-events-none text-white/70">DRAG TO CHOOSE THE AREA</p>
+              <p className="label pointer-events-none text-white/70">DRAG & PINCH TO FRAME</p>
             )}
-
-            <SizeToggle size={cutterSize} onChange={setCutterSize} />
 
             <div className="flex items-center gap-8">
               {mode === 'capture' ? (
@@ -520,18 +516,53 @@ export default function Capture() {
               ← RETAKE
             </button>
 
+            <h1
+              className={`mt-6 whitespace-pre-line font-headline text-[48px] leading-[0.95] font-medium tracking-[-0.03em] transition-opacity duration-300 ${
+                settled ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              {'Your stamp\nis ready'}
+            </h1>
+
+            <StampDeco
+              variant="red"
+              className={`transition-opacity duration-300 ${
+                settled ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+
             {/*
-              The stamp rests high on the screen, well above the centred spot
-              it was cut at — that gap is what the move up actually travels.
-              The carrier owns position (the move); the stamp inside owns
-              scale (the appear pop). Splitting them keeps the two animations
-              from overwriting each other's transform.
+              Outer wrapper sits still — it's sized to the stamp's rest size
+              and never moves, so the press mark below can be positioned
+              against it without also riding along on the flight.
+              The carrier inside owns the move (the FLIP transform); the
+              stamp inside that owns scale (the appear pop). Splitting all
+              three keeps their animations from overwriting each other's
+              transform.
             */}
-            <div ref={carrierRef} className="mx-auto mt-8 w-fit" style={carrierStyle}>
-              <Stamp
-                image={croppedImage}
-                animate={false}
-                className="animate-[stamp-appear_0.4s_linear_both]"
+            <div className="relative mx-auto mt-8 w-fit">
+              <div ref={carrierRef} style={carrierStyle}>
+                <Stamp
+                  image={croppedImage}
+                  animate={false}
+                  className="animate-[stamp-appear_0.4s_linear_both]"
+                />
+              </div>
+
+              {/*
+                The "press": a stamped flourish landing on the card's corner
+                once it's settled, not before — appearing mid-flight would
+                have it riding the FLIP transform along with everything else
+                and reading as part of the photo instead of a mark on top of it.
+              */}
+              <img
+                data-art
+                src={stampPress}
+                alt=""
+                className={`pointer-events-none absolute transition-opacity duration-300 ${
+                  settled ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{ left: 110.5, top: STAMP_H * 0.786, width: 165, height: 98.669 }}
               />
             </div>
 
@@ -540,28 +571,83 @@ export default function Capture() {
                 settled ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
             >
-              <label className="label block text-left text-ink/60" htmlFor="stamp-date">
-                DATE
-              </label>
-              <input
-                id="stamp-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-ink/25 bg-white/55 px-4 py-3 text-[16px] text-ink"
-              />
+              {/*
+                Same lined-paper treatment as the message field below, just
+                one rule instead of a page of them — a single dashed strip
+                inset near the bottom, since a one-line field only needs the
+                one line the text sits on.
+              */}
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="label block text-left text-ink/60" htmlFor="stamp-date">
+                    DATE
+                  </label>
+                  <div className="relative mt-2 rounded-xl bg-[#FCFCFC]">
+                    <div
+                      className="pointer-events-none absolute inset-x-3 bottom-3 h-[2px] overflow-hidden [&>svg]:block"
+                      dangerouslySetInnerHTML={{ __html: fieldLineSvg }}
+                    />
+                    <input
+                      id="stamp-date"
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="relative w-full rounded-xl bg-transparent px-3 py-3 text-[16px] text-ink"
+                    />
+                  </div>
+                </div>
 
-              <label className="label mt-5 block text-left text-ink/60" htmlFor="stamp-location">
-                LOCATION
+                <div className="flex-1">
+                  <label className="label block text-left text-ink/60" htmlFor="stamp-location">
+                    LOCATION
+                  </label>
+                  <div className="relative mt-2 rounded-xl bg-[#FCFCFC]">
+                    <div
+                      className="pointer-events-none absolute inset-x-3 bottom-3 h-[2px] overflow-hidden [&>svg]:block"
+                      dangerouslySetInnerHTML={{ __html: fieldLineSvg }}
+                    />
+                    <input
+                      id="stamp-location"
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="Where?"
+                      className="relative w-full rounded-xl bg-transparent px-3 py-3 text-[16px] text-ink placeholder:text-ink/35"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <label className="label mt-5 block text-left text-ink/60" htmlFor="stamp-message">
+                MESSAGE
               </label>
-              <input
-                id="stamp-location"
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Where did you find it?"
-                className="mt-2 w-full rounded-xl border border-ink/25 bg-white/55 px-4 py-3 text-[16px] text-ink placeholder:text-ink/35"
-              />
+              {/*
+                The card's fill is a plain white on this wrapper now, not
+                part of the art — simpler, and it means the white always
+                covers exactly the field's own rounded corners. Only the
+                ruled lines still come from the SVG, inlined (not an
+                <img src>) and told to ignore its own aspect ratio via
+                preserveAspectRatio="none" — that's a native SVG stretch,
+                unlike `object-fit: fill` or a CSS background-size
+                percentage on the textarea itself (both tried first), which
+                some browsers apply to an SVG's own intrinsic ratio instead
+                of the box asked for, letterboxing it into a small patch
+                instead of filling the field.
+              */}
+              <div className="relative mt-2 rounded-2xl bg-[#FCFCFC]">
+                <div
+                  className="absolute inset-0 overflow-hidden rounded-2xl [&>svg]:block"
+                  dangerouslySetInnerHTML={{ __html: messagePaperSvg }}
+                />
+                <textarea
+                  id="stamp-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Write a little something…"
+                  rows={4}
+                  className="relative w-full resize-none rounded-2xl bg-transparent px-4 py-3 text-[16px] text-ink placeholder:text-ink/40"
+                />
+              </div>
             </div>
 
             <div
