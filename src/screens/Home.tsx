@@ -63,13 +63,13 @@ export default function Home() {
         data-art
         src={mailboxWhite}
         alt=""
-        className={`absolute top-[294px] left-[157px] w-[219px] ${RISE}`}
+        className={`absolute top-[294px] left-[180px] w-[219px] ${RISE}`}
         style={rise(ENTRANCE.white)}
       />
 
       {/* Yellow postbox — your collection */}
       <div
-        className={`absolute top-[431px] left-[232px] h-[554px] w-[220px] ${RISE}`}
+        className={`absolute top-[431px] left-[255px] h-[554px] w-[220px] ${RISE}`}
         style={rise(ENTRANCE.yellow)}
       >
         <img data-art src={mailboxYellow} alt="" className="absolute top-[26px] left-0 w-[220px]" />
@@ -85,7 +85,7 @@ export default function Home() {
 
       {/* Blue postbox — about */}
       <div
-        className={`absolute top-[385px] left-[-58px] h-[611px] w-[211px] ${RISE}`}
+        className={`absolute top-[385px] left-[-35px] h-[611px] w-[211px] ${RISE}`}
         style={rise(ENTRANCE.blue)}
       >
         <img data-art src={mailboxBlue} alt="" className="absolute top-[27px] left-0 w-[211px]" />
@@ -101,7 +101,7 @@ export default function Home() {
 
       {/* Red postbox — send a letter */}
       <div
-        className={`absolute top-[560px] left-[21px] h-[441px] w-[195px] ${RISE}`}
+        className={`absolute top-[560px] left-[44px] h-[441px] w-[195px] ${RISE}`}
         style={rise(ENTRANCE.red)}
       >
         <img data-art src={mailboxRed} alt="" className="absolute inset-0 w-[195px]" />
