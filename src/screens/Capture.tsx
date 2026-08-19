@@ -562,7 +562,7 @@ export default function Capture() {
                 className={`pointer-events-none absolute transition-opacity duration-300 ${
                   settled ? 'opacity-100' : 'opacity-0'
                 }`}
-                style={{ left: 110.5, top: STAMP_H * 0.786, width: 165, height: 98.669 }}
+                style={{ left: 110.5, top: STAMP_H * 0.786 - 15, width: 165, height: 98.669 }}
               />
             </div>
 
