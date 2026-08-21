@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import Stamp from '../components/Stamp'
 import { PaperInput, PaperTextarea } from '../components/PaperField'
 import LetterSequence from '../components/LetterSequence'
+import { recordFilm } from '../lib/letterFilm'
 import { listStamps } from '../lib/collection'
 import type { Stamp as StampType } from '../lib/types'
 import { formatStampDate } from '../lib/dates'
@@ -25,6 +26,9 @@ export default function SendLetter() {
   const [chosenId, setChosenId] = useState<string | null>(null)
 
   const [stage, setStage] = useState<Stage>('compose')
+  /** Frame reached while saving, so the button can say how far along it is. */
+  const [saving, setSaving] = useState<{ at: number; of: number } | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [sender, setSender] = useState('')
   const [receiver, setReceiver] = useState('')
   const [title, setTitle] = useState('')
@@ -72,6 +76,26 @@ export default function SendLetter() {
    * the page's own ground frame it would read as a picture of a mailbox rather
    * than the letter actually going into one.
    */
+  async function saveFilm() {
+    if (saving) return
+    setSaveError(null)
+    setSaving({ at: 0, of: 0 })
+    try {
+      const { blob, extension } = await recordFilm(details, (at, of) => setSaving({ at, of }))
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `stampo-letter.${extension}`
+      link.click()
+      // Left long enough for the browser to have taken the file off the URL.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch {
+      setSaveError("Couldn't save the sequence on this device.")
+    } finally {
+      setSaving(null)
+    }
+  }
+
   if (stage === 'sending') {
     return (
       <div className="relative min-h-dvh">
@@ -83,6 +107,24 @@ export default function SendLetter() {
         >
           ← BACK
         </button>
+
+        <div className="absolute inset-x-6 bottom-[max(2rem,env(safe-area-inset-bottom))] z-10">
+          {saveError && (
+            <p className="mb-2 text-center text-[14px] leading-[20px] text-sun">{saveError}</p>
+          )}
+          <button
+            type="button"
+            onClick={saveFilm}
+            disabled={!!saving}
+            className="label w-full rounded-full bg-sun py-4 text-ink active:scale-[0.98] disabled:opacity-70"
+          >
+            {saving
+              ? saving.of
+                ? `SAVING ${saving.at}/${saving.of}`
+                : 'SAVING…'
+              : 'SAVE THIS LETTER'}
+          </button>
+        </div>
       </div>
     )
   }

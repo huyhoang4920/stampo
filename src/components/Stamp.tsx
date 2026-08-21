@@ -28,9 +28,9 @@ export const STAMP_H = STAMP_W * (CUTTER_WINDOW.height / CUTTER_WINDOW.width)
  * crowding the scalloped edge — object-cover trims a sliver off the top and
  * bottom of a captured photo to make room.
  */
-const PHOTO_SIZE_X = 77
+export const PHOTO_SIZE_X = 77
 const PHOTO_DISPLAY_RATIO = 300 / 185 // height : width, the card's own ratio runs taller than this
-const PHOTO_SIZE_Y = PHOTO_DISPLAY_RATIO * PHOTO_SIZE_X * (STAMP_W / STAMP_H)
+export const PHOTO_SIZE_Y = PHOTO_DISPLAY_RATIO * PHOTO_SIZE_X * (STAMP_W / STAMP_H)
 const PHOTO_INSET_X = (100 - PHOTO_SIZE_X) / 2
 const PHOTO_INSET_Y = (100 - PHOTO_SIZE_Y) / 2
 
