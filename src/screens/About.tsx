@@ -238,9 +238,14 @@ export default function About() {
           and both options' columns in step with each other.
         */}
         <Reveal delay={100} className="mt-8">
+          {/*
+            Sized to its content and centred as one block, so the connector and
+            the pills it feeds sit in the middle of the page together — laying
+            the grid out full-width would pin the spine to the left margin.
+          */}
           <div
-            className="grid items-center gap-y-2"
-            style={{ gridTemplateColumns: `${STUB_W}px minmax(0, 1fr)` }}
+            className="mx-auto grid w-fit items-center gap-y-2"
+            style={{ gridTemplateColumns: `${STUB_W}px max-content` }}
           >
             {/*
               The spine. Spanning to the end of the last pill's row and then

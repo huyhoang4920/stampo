@@ -5,8 +5,7 @@ import CaptureFrame, { PUNCH_MS } from '../components/CaptureFrame'
 import Stamp, { STAMP_FRAME_SRC, STAMP_H } from '../components/Stamp'
 import StampDeco from '../components/StampDeco'
 import stampPress from '../assets/art/stamp-press.svg'
-import messagePaperSvg from '../assets/art/message-paper.svg?raw'
-import fieldLineSvg from '../assets/art/field-line.svg?raw'
+import { PaperInput, PaperTextarea } from '../components/PaperField'
 import ModeToggle, { type CaptureMode } from '../components/ModeToggle'
 import { useCamera } from '../lib/useCamera'
 import UploadCropper from '../components/UploadCropper'
@@ -571,90 +570,33 @@ export default function Capture() {
                 settled ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
             >
-              {/*
-                Same lined-paper treatment as the message field below, just
-                one rule instead of a page of them — a single dashed strip
-                inset near the bottom, since a one-line field only needs the
-                one line the text sits on.
-              */}
               <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="label block text-left text-ink/60" htmlFor="stamp-date">
-                    DATE
-                  </label>
-                  <div className="relative mt-2 rounded-xl bg-[#FCFCFC]">
-                    <div
-                      className="pointer-events-none absolute inset-x-3 bottom-3 h-[2px] overflow-hidden [&>svg]:block"
-                      dangerouslySetInnerHTML={{ __html: fieldLineSvg }}
-                    />
-                    <input
-                      id="stamp-date"
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      // Fixed height rather than relying on the padding alone —
-                      // some mobile browsers size a date input to its own
-                      // internal picker control and ignore vertical padding,
-                      // which left it hugging the text shorter than LOCATION.
-                      // Line-height matching that same height is what actually
-                      // centers the date digits in the box — without it some
-                      // browsers set the internal fields top-aligned instead.
-                      className="relative block h-[50px] w-full rounded-xl bg-transparent px-3 text-[16px] leading-[50px] text-ink"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex-1">
-                  <label className="label block text-left text-ink/60" htmlFor="stamp-location">
-                    LOCATION
-                  </label>
-                  <div className="relative mt-2 rounded-xl bg-[#FCFCFC]">
-                    <div
-                      className="pointer-events-none absolute inset-x-3 bottom-3 h-[2px] overflow-hidden [&>svg]:block"
-                      dangerouslySetInnerHTML={{ __html: fieldLineSvg }}
-                    />
-                    <input
-                      id="stamp-location"
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="Where?"
-                      className="relative block h-[50px] w-full rounded-xl bg-transparent px-3 text-[16px] text-ink placeholder:text-ink/35"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <label className="label mt-5 block text-left text-ink/60" htmlFor="stamp-message">
-                MESSAGE
-              </label>
-              {/*
-                The card's fill is a plain white on this wrapper now, not
-                part of the art — simpler, and it means the white always
-                covers exactly the field's own rounded corners. Only the
-                ruled lines still come from the SVG, inlined (not an
-                <img src>) and told to ignore its own aspect ratio via
-                preserveAspectRatio="none" — that's a native SVG stretch,
-                unlike `object-fit: fill` or a CSS background-size
-                percentage on the textarea itself (both tried first), which
-                some browsers apply to an SVG's own intrinsic ratio instead
-                of the box asked for, letterboxing it into a small patch
-                instead of filling the field.
-              */}
-              <div className="relative mt-2 rounded-2xl bg-[#FCFCFC]">
-                <div
-                  className="absolute inset-0 overflow-hidden rounded-2xl [&>svg]:block"
-                  dangerouslySetInnerHTML={{ __html: messagePaperSvg }}
+                <PaperInput
+                  id="stamp-date"
+                  label="DATE"
+                  type="date"
+                  value={date}
+                  onChange={setDate}
+                  className="flex-1"
                 />
-                <textarea
-                  id="stamp-message"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Write a little something…"
-                  rows={4}
-                  className="relative w-full resize-none rounded-2xl bg-transparent px-4 py-3 text-[16px] text-ink placeholder:text-ink/40"
+                <PaperInput
+                  id="stamp-location"
+                  label="LOCATION"
+                  value={location}
+                  onChange={setLocation}
+                  placeholder="Where?"
+                  className="flex-1"
                 />
               </div>
+
+              <PaperTextarea
+                id="stamp-message"
+                label="MESSAGE"
+                value={message}
+                onChange={setMessage}
+                placeholder="Write a little something…"
+                className="mt-5"
+              />
             </div>
 
             <div
