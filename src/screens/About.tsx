@@ -11,13 +11,165 @@ import iconArrow from '../assets/art/about-icon-arrow.svg'
 import badge510 from '../assets/art/about-badge-5-10.svg'
 import badge2030 from '../assets/art/about-badge-20-30.svg'
 import badgeDone from '../assets/art/about-badge-done.svg'
-import connectorA from '../assets/art/about-connector-a.svg'
-import connectorB from '../assets/art/about-connector-b.svg'
 import rotationCircle from '../assets/art/about-rotation-circle.svg'
 import tshirtPhoto from '../assets/art/about-tshirt.png'
 
 /** Small caption copy throughout this page — one size, always uppercase. */
 const CAPTION = 'text-[14px] leading-4 uppercase text-ink'
+/**
+ * An option pill is always a single line, so its height — and with it the
+ * offset of its centre — is a constant the connector can be built against.
+ */
+const PILL_HALF = 24
+/** How far the connector reaches from its spine across to the pills. */
+const STUB_W = 34
+/** Option B sits one step further in than Option A, as drawn. */
+const OPTION_B_INDENT = 32
+
+/** The width this page was drawn on. */
+const CANVAS_W = 440
+/**
+ * A drawn length, held to its drawn proportion of the canvas on anything
+ * narrower and capped at the literal value once there's room for it. The step
+ * headings need this: at their drawn sizes the number, its hairline and the
+ * title together overrun a 375px phone, and scaling them together is what
+ * keeps the hairline's relationship to the number intact instead of letting
+ * the title collide with it.
+ */
+function drawn(px: number): string {
+  return `min(${((px / CANVAS_W) * 100).toFixed(2)}vw, ${px}px)`
+}
+
+/**
+ * A step's number and title. The hairline is anchored to the number itself
+ * rather than to the row, so it always sweeps up out of the digit the way
+ * it's drawn — wherever the row's centring happens to put that digit.
+ */
+function StepHeading({
+  number,
+  title,
+  delay,
+  className = '',
+}: {
+  number: string
+  title: string
+  delay?: number
+  className?: string
+}) {
+  return (
+    <Reveal
+      delay={delay}
+      className={`flex items-center justify-center ${className}`}
+      style={{ gap: drawn(48) }}
+    >
+      <span
+        className="relative shrink-0 font-headline leading-none tracking-[-0.03em] text-ink"
+        style={{ fontSize: drawn(72) }}
+      >
+        {number}
+        {/*
+          Anchored to the number rather than to the row, so it always sweeps
+          up out of the digit — wherever the row's centring puts that digit —
+          and costs no layout width of its own on the way.
+        */}
+        {/*
+          `max-w-none` matters: this is positioned against the number, so the
+          default `max-width: 100%` would otherwise clamp the hairline to the
+          width of a single digit.
+        */}
+        <img
+          src={swash}
+          alt=""
+          className="pointer-events-none absolute top-1/2 max-w-none -translate-y-1/2"
+          style={{ left: `calc(-1 * ${drawn(8)})`, width: drawn(87) }}
+        />
+      </span>
+      <h2
+        className="whitespace-pre-line font-headline leading-[1.25] font-semibold tracking-[-0.03em] text-ink"
+        style={{ fontSize: drawn(32) }}
+      >
+        {title}
+      </h2>
+    </Reveal>
+  )
+}
+
+/**
+ * One style option: its label, pill and caption, plus the connector stub that
+ * branches out of the shared spine. Rendered as `display: contents` so all of
+ * it lands directly in the parent grid — that grid is what keeps the stub on
+ * the pill's centre line and the two options' columns in step.
+ */
+function StyleOption({
+  letter,
+  title,
+  caption,
+  badge,
+  badgeAlt,
+  row,
+  indent = 0,
+  spaceBefore,
+}: {
+  letter: string
+  title: string
+  caption: string
+  badge: string
+  badgeAlt: string
+  /** Grid row the label sits on; the pill and caption follow it. */
+  row: number
+  indent?: number
+  /** Air above this option, on top of the grid's own row gap. */
+  spaceBefore?: number
+}) {
+  return (
+    <div style={{ display: 'contents' }}>
+      <div
+        className="flex items-center"
+        style={{ gridRow: row, gridColumn: 2, marginLeft: indent, marginTop: spaceBefore }}
+      >
+        <svg viewBox="0 0 22 22" className="h-[22px] w-[22px] shrink-0" aria-hidden>
+          <circle cx="11" cy="11" r="11" fill="#EFE9DE" />
+        </svg>
+        <p className={`${CAPTION} -ml-3.5`}>{`Option ${letter}`}</p>
+      </div>
+
+      {/*
+        The stub. It's a grid cell rather than a floating line, so the grid's
+        own `items-center` is what lands it exactly on the pill's centre —
+        no offset to keep in sync with the pill's height by hand.
+      */}
+      <div
+        className="h-px bg-ink"
+        style={{ gridRow: row + 1, gridColumn: 1, width: `calc(100% + ${indent}px)` }}
+      />
+
+      <div
+        className="relative w-fit justify-self-start"
+        style={{ gridRow: row + 1, gridColumn: 2, marginLeft: indent }}
+      >
+        <div className="rounded-full border border-ink bg-cornflower px-4 py-2">
+          <p className="font-headline text-2xl leading-[30px] font-semibold tracking-[-0.03em] text-ink">
+            {title}
+          </p>
+        </div>
+        {/* Straddles the pill's top-right corner, as drawn. */}
+        <img
+          src={badge}
+          alt={badgeAlt}
+          className="pointer-events-none absolute h-18 w-18"
+          style={{ left: 'calc(100% - 32px)', top: -50 }}
+        />
+      </div>
+
+      <p
+        className={`${CAPTION} whitespace-pre-line`}
+        style={{ gridRow: row + 2, gridColumn: 2, marginLeft: indent }}
+      >
+        {caption}
+      </p>
+    </div>
+  )
+}
 
 export default function About() {
   const navigate = useNavigate()
@@ -45,17 +197,7 @@ export default function About() {
         </Reveal>
 
         {/* Step 1 */}
-        <Reveal delay={80} className="relative mt-10 flex items-center justify-center gap-6">
-          <img
-            src={swash}
-            alt=""
-            className="pointer-events-none absolute left-2 top-1/2 h-[68px] w-[54px] -translate-y-1/2"
-          />
-          <span className="font-headline text-[64px] leading-[22px] tracking-[-0.03em] text-ink">1</span>
-          <h2 className="font-headline text-[32px] leading-10 font-semibold tracking-[-0.03em] text-ink">
-            Pick your items
-          </h2>
-        </Reveal>
+        <StepHeading number="1" title="Pick your items" delay={80} className="mt-10" />
 
         <Reveal delay={160} className="mt-8 flex flex-wrap items-end justify-center gap-x-3 gap-y-5">
           <div className="flex flex-col items-center gap-2">
@@ -88,69 +230,48 @@ export default function About() {
 
       {/* Step 2 */}
       <div className="bg-gold px-6 pb-8">
-        <Reveal className="relative flex items-center justify-center gap-6 py-2">
-          <img
-            src={swash}
-            alt=""
-            className="pointer-events-none absolute left-4 top-[calc(50%+8px)] h-[68px] w-[54px] -translate-y-1/2"
-          />
-          <span className="font-headline text-[64px] leading-[22px] tracking-[-0.03em] text-ink">2</span>
-          <h2 className="font-headline text-[32px] leading-10 font-semibold tracking-[-0.03em] text-ink">
-            Choose your style
-          </h2>
-        </Reveal>
+        <StepHeading number="2" title="Choose your style" className="py-2" />
 
-        <Reveal delay={100} className="relative mt-8">
-          <div className="flex items-center">
-            <svg viewBox="0 0 22 22" className="h-[22px] w-[22px] shrink-0" aria-hidden>
-              <circle cx="11" cy="11" r="11" fill="#EFE9DE" />
-            </svg>
-            <p className={`${CAPTION} -ml-3.5`}>Option A</p>
+        {/*
+          Both options on one grid: column 1 carries the connector, column 2
+          the content. That's what keeps each stub on its pill's centre line
+          and both options' columns in step with each other.
+        */}
+        <Reveal delay={100} className="mt-8">
+          <div
+            className="grid items-center gap-y-2"
+            style={{ gridTemplateColumns: `${STUB_W}px minmax(0, 1fr)` }}
+          >
+            {/*
+              The spine. Spanning to the end of the last pill's row and then
+              pulled back up by half a pill stops it exactly on that pill's
+              centre, where its own stub branches off.
+            */}
+            <div
+              className="w-px justify-self-start self-stretch bg-ink"
+              style={{ gridArea: '1 / 1 / 6 / 2', marginBottom: PILL_HALF }}
+            />
+
+            <StyleOption
+              letter="A"
+              title="ready-made patch"
+              caption={'Pick from our patch collection\nIcons, symbols or letter stamps'}
+              badge={badge510}
+              badgeAlt="Takes 5 to 10 minutes"
+              row={1}
+            />
+
+            <StyleOption
+              letter="B"
+              title="custom print"
+              caption={'Choose a design template\nAdd your name\nPrinted fresh for you'}
+              badge={badge2030}
+              badgeAlt="Takes 20 to 30 minutes"
+              row={4}
+              indent={OPTION_B_INDENT}
+              spaceBefore={24}
+            />
           </div>
-          <div className="mt-2 w-fit rounded-full border border-ink bg-cornflower px-4 py-2">
-            <p className="font-headline text-2xl leading-[30px] font-semibold tracking-[-0.03em] text-ink">
-              ready-made patch
-            </p>
-          </div>
-          <p className={`${CAPTION} mt-2 whitespace-pre-line`}>
-            {'Pick from our patch collection\nIcons, symbols or letter stamps'}
-          </p>
-
-          <img
-            src={badge2030}
-            alt="Takes 20 to 30 minutes"
-            className="pointer-events-none absolute -top-4 right-4 h-18 w-18"
-          />
-        </Reveal>
-
-        <Reveal delay={220} className="relative mt-8 pl-32">
-          <img src={connectorA} alt="" className="pointer-events-none absolute top-0 left-[60px] h-[89px] w-9" />
-          <img
-            src={connectorB}
-            alt=""
-            className="pointer-events-none absolute top-[76px] left-[60px] h-[158px] w-[62px]"
-          />
-
-          <div className="flex items-center">
-            <svg viewBox="0 0 22 22" className="h-[22px] w-[22px] shrink-0" aria-hidden>
-              <circle cx="11" cy="11" r="11" fill="#EFE9DE" />
-            </svg>
-            <p className={`${CAPTION} -ml-3.5`}>Option B</p>
-          </div>
-          <div className="mt-2 w-fit rounded-full border border-ink bg-cornflower px-4 py-2">
-            <p className="font-headline text-2xl leading-[30px] font-semibold tracking-[-0.03em] text-ink">
-              custom print
-            </p>
-          </div>
-          <p className={`${CAPTION} mt-2 whitespace-pre-line`}>
-            {'Choose a design template\nAdd your name\nPrinted fresh for you'}
-          </p>
-
-          <img
-            src={badge510}
-            alt="Takes 5 to 10 minutes"
-            className="pointer-events-none absolute top-1 right-0 h-18 w-18"
-          />
         </Reveal>
       </div>
 
@@ -162,17 +283,7 @@ export default function About() {
 
       {/* Step 3 */}
       <div className="px-6 pb-16">
-        <Reveal className="relative flex items-center justify-center gap-6">
-          <img
-            src={swash}
-            alt=""
-            className="pointer-events-none absolute left-2 top-1/2 h-[68px] w-[54px] -translate-y-1/2"
-          />
-          <span className="font-headline text-[64px] leading-[22px] tracking-[-0.03em] text-ink">3</span>
-          <h2 className="font-headline text-[32px] leading-10 font-semibold tracking-[-0.03em] text-ink whitespace-pre-line">
-            {'Watch it\ncome to life!'}
-          </h2>
-        </Reveal>
+        <StepHeading number="3" title={'Watch it\ncome to life!'} />
 
         <Reveal delay={100} className="mt-8 flex items-start justify-center gap-8">
           <p className={`${CAPTION} w-[190px] whitespace-pre-line`}>
