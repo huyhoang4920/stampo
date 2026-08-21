@@ -71,7 +71,12 @@ export default function StampDetail({
   }`;
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col overflow-y-auto px-6 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))]">
+    /*
+      `fixed`, not `absolute`: this is sized to the screen, and the collection
+      behind it is as tall as the collection is. Anchored to that instead, the
+      overlay grew with the grid and its actions ended up below the fold.
+    */
+    <div className="fixed inset-0 z-30 flex flex-col overflow-y-auto px-6 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))]">
       {/*
         A separate layer rather than the background on this whole container:
         everything else here (the stamp especially) needs to stay fully
@@ -102,12 +107,6 @@ export default function StampDetail({
         a close tap once settled — a lightbox reads as dismissable by its own
         image, not just the button above it.
       */}
-      {/*
-        `my-auto` splits the leftover height above and below this group, so the
-        actions land at the bottom of the screen without a single tall void
-        opening up between them and the stamp.
-      */}
-      <div className="my-auto">
         <div
           ref={carrierRef}
           className="mx-auto mt-8 w-fit cursor-pointer"
@@ -182,9 +181,15 @@ export default function StampDetail({
             </p>
           </div>
         )}
-      </div>
 
-      <div className={`flex flex-col gap-3 pt-8 ${fade}`}>
+      {/*
+        `mt-auto` and nothing more: the actions drop to the bottom when the
+        stamp and its details leave room, and simply follow them when they
+        don't. Centring the group with `my-auto` instead looked right on a
+        short stamp but added space above it that a tall one had no room to
+        give, pushing the details off the bottom of the screen.
+      */}
+      <div className={`mt-auto flex flex-col gap-3 pt-8 ${fade}`}>
         {mode === "view" && (
           <>
             <button
