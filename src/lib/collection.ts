@@ -5,7 +5,10 @@ const KEY = 'stampo.collection.v1'
 function read(): Stamp[] {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as Stamp[]) : []
+    if (!raw) return []
+    // `message` arrived after the first stamps were filed, so anything saved
+    // before then comes back without one.
+    return (JSON.parse(raw) as Stamp[]).map((s) => ({ ...s, message: s.message ?? '' }))
   } catch {
     return []
   }
@@ -44,7 +47,10 @@ export function addStamp(stamp: NewStamp): Stamp {
 }
 
 /** Change a stamp's details in place; identity and filing date are kept. */
-export function updateStamp(id: string, patch: Partial<Pick<Stamp, 'date' | 'location'>>) {
+export function updateStamp(
+  id: string,
+  patch: Partial<Pick<Stamp, 'date' | 'location' | 'message'>>,
+) {
   write(read().map((s) => (s.id === id ? { ...s, ...patch } : s)))
 }
 

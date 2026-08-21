@@ -12,6 +12,8 @@ export type Stamp = {
   image: string
   /** Where the stamp was collected, free text (e.g. "Kyoto, Japan"). */
   location: string
+  /** Whatever was written alongside it. Free text, and often empty. */
+  message: string
   /** Date on the stamp, ISO yyyy-mm-dd. */
   date: string
   /** When the stamp was filed, epoch ms. */

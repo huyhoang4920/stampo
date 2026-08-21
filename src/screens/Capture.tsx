@@ -260,7 +260,12 @@ export default function Capture() {
     setSaving(true)
     try {
       const image = await capImageSize(croppedImage, 1200)
-      const saved = addStamp({ image, date, location: location.trim() })
+      const saved = addStamp({
+        image,
+        date,
+        location: location.trim(),
+        message: message.trim(),
+      })
       setSaveError(null)
       return saved
     } catch {

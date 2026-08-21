@@ -130,7 +130,7 @@ export default function Collection() {
     window.history.back()
   }
 
-  function handleSave(patch: { date: string; location: string }) {
+  function handleSave(patch: { date: string; location: string; message: string }) {
     if (!detail) return
     updateStamp(detail.stamp.id, patch)
     // Only the grid behind is refreshed. Replacing `detail` here would change

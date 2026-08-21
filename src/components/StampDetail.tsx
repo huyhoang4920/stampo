@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Ref } from "react";
 import Stamp from "./Stamp";
 import StampDeco from "./StampDeco";
+import { PaperInput, PaperTextarea } from "./PaperField";
 import type { Stamp as StampType } from "../lib/types";
 import { formatStampDate } from "../lib/dates";
 
@@ -25,7 +26,7 @@ type StampDetailProps = {
   closing: boolean;
   onClose: () => void;
   onSend: (stamp: StampType) => void;
-  onSave: (patch: { date: string; location: string }) => void;
+  onSave: (patch: { date: string; location: string; message: string }) => void;
   onDelete: () => void;
 };
 
@@ -48,11 +49,13 @@ export default function StampDetail({
 }: StampDetailProps) {
   const [mode, setMode] = useState<Mode>("view");
   const [date, setDate] = useState(stamp.date);
-  const [location, setLocation] = useState(stamp.location);
+  const [location, setLocation] = useState(stamp.location)
+  const [message, setMessage] = useState(stamp.message);
   /** Last committed values, so Cancel can restore them after an edit. */
   const [saved, setSaved] = useState({
     date: stamp.date,
     location: stamp.location,
+    message: stamp.message,
   });
   /**
    * Starts false on the very first paint, then flips true a tick later —
@@ -139,34 +142,34 @@ export default function StampDetail({
         )}
 
         {mode === "edit" && (
+          /* The same fields, in the same arrangement, as filing a new stamp. */
           <div className={`mt-8 ${fade}`}>
-            <label
-              className="label block text-left text-white/70"
-              htmlFor="edit-date"
-            >
-              DATE
-            </label>
-            <input
-              id="edit-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-white/40 bg-white/90 px-4 py-3 text-[16px] text-ink"
-            />
+            <div className="flex gap-3">
+              <PaperInput
+                id="edit-date"
+                label="DATE"
+                type="date"
+                value={date}
+                onChange={setDate}
+                className="flex-1"
+              />
+              <PaperInput
+                id="edit-location"
+                label="LOCATION"
+                value={location}
+                onChange={setLocation}
+                placeholder="Where?"
+                className="flex-1"
+              />
+            </div>
 
-            <label
-              className="label mt-5 block text-left text-white/70"
-              htmlFor="edit-location"
-            >
-              LOCATION
-            </label>
-            <input
-              id="edit-location"
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Where did you find it?"
-              className="mt-2 w-full rounded-xl border border-white/40 bg-white/90 px-4 py-3 text-[16px] text-ink placeholder:text-ink/35"
+            <PaperTextarea
+              id="edit-message"
+              label="MESSAGE"
+              value={message}
+              onChange={setMessage}
+              placeholder="Write a little something…"
+              className="mt-5"
             />
           </div>
         )}
@@ -223,8 +226,13 @@ export default function StampDetail({
             <button
               type="button"
               onClick={() => {
-                const next = { date, location: location.trim() };
+                const next = {
+                  date,
+                  location: location.trim(),
+                  message: message.trim(),
+                };
                 setLocation(next.location);
+                setMessage(next.message);
                 setSaved(next);
                 onSave(next);
                 setMode("view");
@@ -239,6 +247,7 @@ export default function StampDetail({
                 // Back to whatever was last saved, discarding this edit.
                 setDate(saved.date);
                 setLocation(saved.location);
+                setMessage(saved.message);
                 setMode("view");
               }}
               className="label w-full rounded-full border-[0.5px] border-sun py-4 text-sun active:scale-[0.98]"
