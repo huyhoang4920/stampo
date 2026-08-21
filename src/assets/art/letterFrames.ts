@@ -61,7 +61,19 @@ export type LetterFrame = {
   layers: string[]
   /** Absent on the frames where the letter hasn't appeared yet. */
   letter?: LetterPose
+  /** Turns the whole envelope on the spot — the jostle before anything moves. */
+  tilt?: string
 }
+
+/**
+ * How far the card is dropped from where it was drawn. The drawings carry it
+ * high enough that it sat against the top of the screen; this brings it down
+ * so it comes to rest in the middle. `DROP_END` is the resting frame and lands
+ * it dead centre; `DROP` leaves the frames before it a touch higher, so the
+ * card still has somewhere to settle.
+ */
+const DROP = 143
+const DROP_END = 173
 
 /**
  * The seven drawings, in order. Layer order and the card's pose are taken
@@ -69,6 +81,12 @@ export type LetterFrame = {
  * between frames, which is what carries the letter out of the envelope.
  */
 export const LETTER_FRAMES: LetterFrame[] = [
+  // Three beats of the envelope being jostled in the mailbox mouth before
+  // anything comes out of it.
+  { layers: [f1back, f1mid, f1top], tilt: '-2.5deg' },
+  { layers: [f1back, f1mid, f1top], tilt: '2deg' },
+  { layers: [f1back, f1mid, f1top], tilt: '-1deg' },
+
   { layers: [f1back, f1mid, f1top] },
   { layers: [f2back, f2mid, f2top] },
   {
@@ -81,14 +99,24 @@ export const LETTER_FRAMES: LetterFrame[] = [
   },
   {
     layers: [f5top, f5back, f5mid],
-    letter: { index: 2, rotate: '1.94deg', translate: '34px -229px', height: 525.31 },
+    letter: {
+      index: 2,
+      rotate: '1.94deg',
+      translate: `34px ${-229 + DROP}px`,
+      height: 525.31,
+    },
   },
   {
     layers: [f6top, f6back, f6mid],
-    letter: { index: 3, rotate: '354.66deg', translate: '-25.242px -241.587px' },
+    letter: { index: 3, rotate: '354.66deg', translate: `-25.242px ${-241.587 + DROP}px` },
   },
   {
     layers: [f7top, f7back, f7mid],
-    letter: { index: 3, rotate: '357.16deg', translate: '1.944px -237.944px' },
+    letter: { index: 3, rotate: '357.16deg', translate: `1.944px ${-237.944 + DROP}px` },
+  },
+  // Settles: the card drops the last of the way and comes to rest centred.
+  {
+    layers: [f7top, f7back, f7mid],
+    letter: { index: 3, rotate: '357.16deg', translate: `1.944px ${-237.944 + DROP_END}px` },
   },
 ]

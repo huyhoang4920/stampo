@@ -81,7 +81,7 @@ export default function LetterSequence({ details, onDone, className = '' }: Lett
     return () => clearTimeout(id)
   }, [frame])
 
-  const { layers, letter } = LETTER_FRAMES[frame]
+  const { layers, letter, tilt } = LETTER_FRAMES[frame]
 
   // The card is drawn in among the envelope's own layers — behind its front
   // while the letter is still inside, in front of it once it's out.
@@ -124,6 +124,10 @@ export default function LetterSequence({ details, onDone, className = '' }: Lett
           Nothing here transitions, deliberately. Stop motion is a cut between
           held drawings — tweening between them would read as the wrong medium.
         */}
+        {/*
+          `tilt` turns the envelope and everything on it together — the jostle
+          in the opening frames is the whole thing moving, not a layer of it.
+        */}
         <div
           className="absolute"
           style={{
@@ -131,6 +135,7 @@ export default function LetterSequence({ details, onDone, className = '' }: Lett
             height: STAGE_H,
             left: (SCENE_W - STAGE_W) / 2,
             top: (SCENE_H - STAGE_H) / 2,
+            rotate: tilt,
           }}
         >
           {stack}
