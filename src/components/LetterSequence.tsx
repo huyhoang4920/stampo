@@ -3,6 +3,7 @@ import LetterCard, { type LetterDetails } from './LetterCard'
 import {
   LETTER_FRAMES,
   MAILBOX,
+  STAGE_DROP,
   MAILBOX_H,
   MAILBOX_W,
   SCENE_H,
@@ -94,8 +95,19 @@ export default function LetterSequence({ details, onDone, className = '' }: Lett
       0,
       <div
         key="letter"
-        className="absolute top-0 left-0 origin-top-left overflow-clip"
-        style={{ rotate: letter.rotate, translate: letter.translate, height: letter.height }}
+        // Pinned by its bottom edge once it's fully out, so however much was
+        // written on it the card still lands in the same place on the
+        // envelope. While it's emerging it's pinned by its top instead —
+        // that's the edge the reveal is measured from.
+        className={`absolute left-0 overflow-clip ${
+          letter.bottom === undefined ? 'top-0 origin-top-left' : 'origin-center'
+        }`}
+        style={{
+          rotate: letter.rotate,
+          translate: letter.translate,
+          height: letter.height,
+          bottom: letter.bottom,
+        }}
       >
         <LetterCard details={details} />
       </div>,
@@ -134,7 +146,7 @@ export default function LetterSequence({ details, onDone, className = '' }: Lett
             width: STAGE_W,
             height: STAGE_H,
             left: (SCENE_W - STAGE_W) / 2,
-            top: (SCENE_H - STAGE_H) / 2,
+            top: (SCENE_H - STAGE_H) / 2 + STAGE_DROP,
             rotate: tilt,
           }}
         >

@@ -54,6 +54,15 @@ type LetterPose = {
   rotate: string
   translate: string
   height?: number
+  /**
+   * Where the card's bottom edge rests, measured up from the stage's bottom.
+   *
+   * The frames where the card is fully out are pinned this way rather than by
+   * their top, because the card's height follows however much was written on
+   * it — anchoring the top left a short letter floating well above the
+   * envelope and a long one running over the From/To line.
+   */
+  bottom?: number
 }
 
 export type LetterFrame = {
@@ -66,16 +75,37 @@ export type LetterFrame = {
 }
 
 /**
- * How far the card sits from where it was drawn.
- *
- * How low it can go is set by the From/To line written on the envelope: the
- * drawn position already left the card's bottom edge only a pixel clear of it,
- * so these keep a real gap instead. `DROP_END` is the resting frame; `DROP`
- * holds the frames before it a little higher, so the card still has somewhere
- * to settle on the last beat.
+ * How far the card sits from where it was drawn, on the frames where it's
+ * still emerging and so pinned by its top edge.
  */
 const DROP = -25
-const DROP_END = -11
+
+/**
+ * Where the card comes to rest, up from the stage's bottom. Clears the From/To
+ * line written on the envelope with room to spare, and sits low enough to look
+ * like it's resting in the envelope rather than hovering over it.
+ */
+const REST_BOTTOM = 106
+/** The frames before the last hold it a little higher, so it still settles. */
+const LIFTED_BOTTOM = 124
+/**
+ * Where the card rests across the envelope. All three closing frames share it:
+ * they were each drawn at their own offset, and once the card has stopped
+ * moving those differences read as a lean rather than as hand-placed. The turn
+ * each frame is drawn at still varies, which is what keeps the life in it.
+ */
+/** The card's own drawn width, for centring it on the envelope. */
+const CARD_W = 339
+/**
+ * Where the resting card sits across the envelope. These frames turn the card
+ * about its own middle, so the angle it's drawn at no longer drags it sideways
+ * — one value holds for every one of them however far it's turned.
+ */
+const REST_X = (STAGE_W - CARD_W) / 2
+
+/** Moves the envelope and everything on it down, to sit nearer the middle. */
+export const STAGE_DROP = 40
+
 
 /**
  * The seven drawings, in order. Layer order and the card's pose are taken
@@ -110,15 +140,30 @@ export const LETTER_FRAMES: LetterFrame[] = [
   },
   {
     layers: [f6top, f6back, f6mid],
-    letter: { index: 3, rotate: '354.66deg', translate: `-25.242px ${-241.587 + DROP}px` },
+    letter: {
+      index: 3,
+      rotate: '354.66deg',
+      translate: `${REST_X}px 0px`,
+      bottom: LIFTED_BOTTOM,
+    },
   },
   {
     layers: [f7top, f7back, f7mid],
-    letter: { index: 3, rotate: '357.16deg', translate: `1.944px ${-237.944 + DROP}px` },
+    letter: {
+      index: 3,
+      rotate: '358.4deg',
+      translate: `${REST_X}px 0px`,
+      bottom: LIFTED_BOTTOM,
+    },
   },
-  // Settles: the card drops the last of the way and comes to rest centred.
+  // Settles: the card drops the last of the way and comes to rest.
   {
     layers: [f7top, f7back, f7mid],
-    letter: { index: 3, rotate: '357.16deg', translate: `1.944px ${-237.944 + DROP_END}px` },
+    letter: {
+      index: 3,
+      rotate: '356.3deg',
+      translate: `${REST_X}px 0px`,
+      bottom: REST_BOTTOM,
+    },
   },
 ]
