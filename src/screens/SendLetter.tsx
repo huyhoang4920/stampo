@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Stamp from '../components/Stamp'
 import { PaperInput, PaperTextarea } from '../components/PaperField'
 import LetterSequence from '../components/LetterSequence'
-import { getStamp } from '../lib/collection'
+import { listStamps } from '../lib/collection'
 import type { Stamp as StampType } from '../lib/types'
 import { formatStampDate } from '../lib/dates'
 
@@ -14,13 +14,15 @@ import { formatStampDate } from '../lib/dates'
 type Stage = 'compose' | 'sending'
 
 /**
- * The letter flow. The stamp being sent arrives as `?stamp=<id>`, set by both
- * the capture result screen and the collection.
+ * The letter flow. Any stamp in the collection can be the one sent; arriving
+ * with `?stamp=<id>` — as the capture result screen and the collection both
+ * do — just picks that one out of the row to begin with.
  */
 export default function SendLetter() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [stamp, setStamp] = useState<StampType | undefined>()
+  const [stamps, setStamps] = useState<StampType[]>([])
+  const [chosenId, setChosenId] = useState<string | null>(null)
 
   const [stage, setStage] = useState<Stage>('compose')
   const [sender, setSender] = useState('')
@@ -31,8 +33,29 @@ export default function SendLetter() {
   const id = params.get('stamp')
 
   useEffect(() => {
-    setStamp(id ? getStamp(id) : undefined)
+    const all = listStamps()
+    setStamps(all)
+    setChosenId((current) => {
+      if (current && all.some((s) => s.id === current)) return current
+      if (id && all.some((s) => s.id === id)) return id
+      return all[0]?.id ?? null
+    })
   }, [id])
+
+  const stamp = stamps.find((s) => s.id === chosenId)
+
+  /**
+   * Brings the starting pick into view once, so arriving from the collection
+   * doesn't leave the chosen stamp somewhere off the end of the row. Only the
+   * first time — doing it on every pick would yank the row around under
+   * someone who is scrolling it themselves.
+   */
+  const centred = useRef(false)
+  const centreOnce = useCallback((el: HTMLButtonElement | null) => {
+    if (!el || centred.current) return
+    centred.current = true
+    el.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [])
 
   const details = {
     sender,
@@ -79,18 +102,40 @@ export default function SendLetter() {
             {'Send a\nletter'}
           </h1>
 
-          {stamp ? (
-            <div className="mt-8 flex flex-col items-center">
-              <Stamp image={stamp.image} animate={false} width="min(42vw, 170px)" />
-              <p className="label mt-4 text-ink/60">
-                {formatStampDate(stamp.date)}
-                {stamp.location ? ` · ${stamp.location}` : ''}
-              </p>
-            </div>
+          {stamps.length === 0 ? (
+            <p className="label mt-8 text-ink/50">No stamps yet — cut one first.</p>
           ) : (
-            <p className="label mt-8 text-ink/50">
-              {id ? "That stamp isn't in your collection." : 'No stamp chosen yet.'}
-            </p>
+            <>
+              {/*
+                Runs past the page's own padding on both sides, so a stamp can
+                sit half off the edge and read as a row that carries on rather
+                than one that has been cut short.
+              */}
+              <div className="-mx-6 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {stamps.map((s) => {
+                  const chosen = s.id === chosenId
+                  return (
+                    <button
+                      key={s.id}
+                      ref={chosen ? centreOnce : undefined}
+                      type="button"
+                      onClick={() => setChosenId(s.id)}
+                      aria-pressed={chosen}
+                      aria-label={`Send the stamp from ${formatStampDate(s.date)}${
+                        s.location ? `, ${s.location}` : ''
+                      }`}
+                      className={`shrink-0 snap-center transition-[opacity,transform] duration-200 ${
+                        chosen ? 'opacity-100' : 'scale-90 opacity-40'
+                      }`}
+                    >
+                      <Stamp image={s.image} animate={false} width="min(42vw, 170px)" />
+                    </button>
+                  )
+                })}
+              </div>
+
+              {stamp?.location && <p className="label mt-4 text-ink/60">{stamp.location}</p>}
+            </>
           )}
 
           {/* Same lined-paper fields the stamp's own details are written on. */}
@@ -141,7 +186,8 @@ export default function SendLetter() {
             <button
               type="button"
               onClick={() => setStage('sending')}
-              className="label w-full rounded-full bg-post-red-deep py-4 text-white active:scale-[0.98]"
+              disabled={!stamp}
+              className="label w-full rounded-full bg-post-red-deep py-4 text-white active:scale-[0.98] disabled:opacity-50"
             >
               NEXT
             </button>

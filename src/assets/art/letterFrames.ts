@@ -66,14 +66,16 @@ export type LetterFrame = {
 }
 
 /**
- * How far the card is dropped from where it was drawn. The drawings carry it
- * high enough that it sat against the top of the screen; this brings it down
- * so it comes to rest in the middle. `DROP_END` is the resting frame and lands
- * it dead centre; `DROP` leaves the frames before it a touch higher, so the
- * card still has somewhere to settle.
+ * How far the card sits from where it was drawn.
+ *
+ * How low it can go is set by the From/To line written on the envelope: the
+ * drawn position already left the card's bottom edge only a pixel clear of it,
+ * so these keep a real gap instead. `DROP_END` is the resting frame; `DROP`
+ * holds the frames before it a little higher, so the card still has somewhere
+ * to settle on the last beat.
  */
-const DROP = 143
-const DROP_END = 173
+const DROP = -25
+const DROP_END = -11
 
 /**
  * The seven drawings, in order. Layer order and the card's pose are taken
