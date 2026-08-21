@@ -303,10 +303,17 @@ export default function About() {
             alt=""
             className="absolute inset-0 h-full w-full animate-[spin_18s_linear_infinite]"
           />
+          {/*
+            Nudged right of centre on purpose: the shirt is drawn left of the
+            middle of its own file, so centring the image box leaves the shirt
+            itself looking off inside the ring. Not selectable or draggable —
+            it's part of the illustration, not content to pick up.
+          */}
           <img
             src={tshirtPhoto}
             alt="A t-shirt printed with your stamp design"
-            className="absolute top-1/2 left-1/2 w-[62%] -translate-x-1/2 -translate-y-1/2"
+            draggable={false}
+            className="absolute top-1/2 left-[calc(50%+10px)] w-[62%] -translate-x-1/2 -translate-y-1/2 select-none"
           />
         </Reveal>
 
