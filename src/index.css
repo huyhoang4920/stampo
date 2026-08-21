@@ -25,6 +25,9 @@
   --color-sky: #a4e1fe; /* blue mailbox */
   --color-paper: #f7f4ee; /* white mailbox body */
   --color-flame: #e8542b; /* collection ground */
+  --color-cream: #efe9de; /* about page ground */
+  --color-gold: #ecca59; /* about page's "choose your style" band */
+  --color-cornflower: #7cb2de; /* about page's option pills + rotating seal */
 
   --text-label: 16px;
   --leading-label: 16px;
