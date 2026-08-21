@@ -85,7 +85,7 @@ const DROP = -25
  * line written on the envelope with room to spare, and sits low enough to look
  * like it's resting in the envelope rather than hovering over it.
  */
-const REST_BOTTOM = 106
+export const REST_BOTTOM = 106
 /** The frames before the last hold it a little higher, so it still settles. */
 const LIFTED_BOTTOM = 124
 /**
@@ -103,8 +103,11 @@ const CARD_W = 339
  */
 const REST_X = (STAGE_W - CARD_W) / 2
 
-/** Moves the envelope and everything on it down, to sit nearer the middle. */
-export const STAGE_DROP = 40
+/**
+ * How far the envelope and everything on it sits down the scene, so the card
+ * and envelope together read as centred once the card is out.
+ */
+export const STAGE_DROP = 130
 
 
 /**
